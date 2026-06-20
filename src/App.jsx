@@ -848,10 +848,15 @@ function ChatWindow({ listing, user, onClose }) {
     const senderEmail = user.email || "";
     const senderId = user.id || senderEmail;
     const isOwner = listing.owner_email === user.email;
-    // Always use email as receiver_id for consistency across all users
+    // Determine receiver: if owner, send to claimer; if claimer, send to owner
+    // For owner: use claimer_id (email of claimer)
+    // For non-owner: use owner_email
+    // Both sides can always message each other
     const receiverId = isOwner
       ? listing.claimer_id || ""
       : listing.owner_email || "";
+    // If receiverId is empty (no claimer yet), owner message still saves but has no receiver
+    // This is expected — message will be visible when someone claims
     const tempId = "temp-" + Date.now();
 
     // STEP 1 — Add to local state INSTANTLY, before any network call
@@ -1693,17 +1698,25 @@ function AuthModal({ onClose, onSuccess }) {
         );
         if (res.ok) {
           const data = await res.json();
-          // Only mark as taken if we get a real non-empty result
-          const taken =
-            Array.isArray(data) &&
-            data.length > 0 &&
-            data[0]?.username?.toLowerCase() === clean.toLowerCase();
-          setIsUsernameTaken(taken);
+          if (!Array.isArray(data) || data.length === 0) {
+            // Empty result = username is available
+            setIsUsernameTaken(false);
+          } else {
+            const taken =
+              data[0]?.username?.toLowerCase() === clean.toLowerCase();
+            setIsUsernameTaken(taken);
+          }
         } else {
-          // If profiles table errors (403, 404 etc) — don't block user
+          // 403/404/500 — profiles table issue, never block signup
+          console.warn(
+            "Username check returned",
+            res.status,
+            "— allowing signup"
+          );
           setIsUsernameTaken(false);
         }
-      } catch {
+      } catch (err) {
+        console.warn("Username check error:", err.message, "— allowing signup");
         setIsUsernameTaken(false);
       } finally {
         setCheckingUsername(false);
@@ -3563,6 +3576,11 @@ function ListingCard({
                 {ownerBadge.label}
               </span>
             )}
+            {listing.owner_type === "Corporate/Lab Donor" && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700">
+                ✓ Verified
+              </span>
+            )}
             {isClaimed && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">
                 ⏳ Pending — Awaiting Key B
@@ -3900,9 +3918,12 @@ function ListingsSection({
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(9);
   const [catFilter, setCatFilter] = useState("All");
   const [regionFilter, setRegionFilter] = useState("All Regions");
   const [locationSearch, setLocationSearch] = useState("");
+  const [locationInput, setLocationInput] = useState("");
+  const locationDebounce = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const searchDebounce = useRef(null);
@@ -3955,6 +3976,9 @@ function ListingsSection({
   useEffect(() => {
     fetchListings();
   }, [refreshTrigger]);
+  useEffect(() => {
+    setVisibleCount(9);
+  }, [catFilter, regionFilter, locationSearch, searchQuery, tab]);
 
   // ── RBAC: Derive role ─────────────────────────────────────────────────────
   const isDonor =
@@ -3983,6 +4007,11 @@ function ListingsSection({
       );
     }
   }
+  if (tab === "claims" && user) {
+    filtered = filtered.filter(
+      (l) => l.claimer_id === user.email || l.claimer_id === user.id
+    );
+  }
   if (catFilter !== "All")
     filtered = filtered.filter((l) => l.category === catFilter);
   if (regionFilter !== "All Regions")
@@ -4008,6 +4037,9 @@ function ListingsSection({
 
   // ── Preview slice: only 3 most recent on homepage ────────────────────────
   const previewListings = filtered.slice(0, 3);
+  // ── Paginated slice for marketplace ──────────────────────────────────────
+  const paginatedListings = filtered.slice(0, visibleCount);
+  const hasMore = filtered.length > visibleCount;
 
   // ── Shared card grid renderer ─────────────────────────────────────────────
   const CardGrid = ({ items }) => (
@@ -4041,17 +4073,30 @@ function ListingsSection({
           </button>
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="text-4xl">📦</div>
-          <p className="text-slate-500 text-[14px]">
-            {searchQuery
-              ? `No results for "${searchQuery}"`
-              : tab === "dashboard" && isDonor
-              ? "No listings posted yet. Create your first item above."
-              : tab === "dashboard" && isRecipientUser
-              ? "No active claims yet. Browse available items below."
-              : "No listings match your filters."}
-          </p>
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center text-4xl">
+            {searchQuery ? "🔍" : tab === "dashboard" && isDonor ? "📦" : "🌍"}
+          </div>
+          <div className="text-center">
+            <p className="text-slate-700 font-semibold text-[15px]">
+              {searchQuery
+                ? `No results for "${searchQuery}"`
+                : tab === "dashboard" && isDonor
+                ? "No listings yet"
+                : tab === "dashboard" && isRecipientUser
+                ? "No active claims"
+                : "No listings match your filters"}
+            </p>
+            <p className="text-slate-400 text-[13px] mt-1">
+              {searchQuery
+                ? "Try different keywords or clear the search"
+                : tab === "dashboard" && isDonor
+                ? "Click List Surplus to post your first item"
+                : tab === "dashboard" && isRecipientUser
+                ? "Browse available items and claim one"
+                : "Try adjusting your filters or region"}
+            </p>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -4152,8 +4197,15 @@ function ListingsSection({
             🔍 Location:
           </span>
           <input
-            value={locationSearch}
-            onChange={(e) => setLocationSearch(e.target.value)}
+            value={locationInput}
+            onChange={(e) => {
+              setLocationInput(e.target.value);
+              clearTimeout(locationDebounce.current);
+              locationDebounce.current = setTimeout(
+                () => setLocationSearch(e.target.value),
+                300
+              );
+            }}
             placeholder="Search city, zip, or area…"
             className="flex-1 text-[12px] border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
@@ -4248,7 +4300,17 @@ function ListingsSection({
           <FilterToolbar />
 
           {/* Full scrolling card grid */}
-          <CardGrid items={filtered} />
+          <CardGrid items={paginatedListings} />
+          {hasMore && (
+            <div className="flex justify-center mt-8">
+              <button
+                onClick={() => setVisibleCount((c) => c + 9)}
+                className="flex items-center gap-2 bg-white border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-600 font-medium px-8 py-3 rounded-2xl transition-all shadow-sm hover:shadow-md"
+              >
+                Load more ({filtered.length - visibleCount} remaining)
+              </button>
+            </div>
+          )}
         </div>
         {pinData && (
           <RecipientPinModal
@@ -5192,7 +5254,18 @@ export default function App() {
   const [allListings, setAllListings] = useState([]);
   const [user, setUser] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem("eq_user"));
+      const u = JSON.parse(localStorage.getItem("eq_user"));
+      const token = localStorage.getItem("eq_token");
+      if (!u || !token) return null;
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+          localStorage.removeItem("eq_token");
+          localStorage.removeItem("eq_user");
+          return null;
+        }
+      } catch {}
+      return u;
     } catch {
       return null;
     }
@@ -5223,17 +5296,101 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   const handleAuthSuccess = (u) => {
+    // Set seen timestamp so new user starts with clean unread count
+    localStorage.setItem("eq_msgs_seen_" + u.email, new Date().toISOString());
     setUser(u);
     setShowAuth(false);
   };
   const handleSignOut = () => {
+    const email = user?.email;
     localStorage.removeItem("eq_token");
     localStorage.removeItem("eq_user");
+    if (email) {
+      localStorage.removeItem("eq_msgs_seen_" + email);
+      localStorage.removeItem("eq_transferred_count");
+    }
     setUser(null);
+    setUnreadCount(0);
   };
 
   return (
-    <div className="font-sans antialiased text-slate-900 bg-white">
+    <div className="font-sans antialiased text-slate-900 bg-white pb-16 md:pb-0">
+      {/* Mobile bottom nav */}
+      {user && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-2 py-2 shadow-lg">
+          <button
+            onClick={() => scrollToId("browse")}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-5 h-5"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <span className="text-[10px] font-medium">Browse</span>
+          </button>
+          <button
+            onClick={() => scrollToId("list")}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-5 h-5"
+            >
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+            <span className="text-[10px] font-medium">List</span>
+          </button>
+          <button
+            onClick={() => setShowInbox(true)}
+            className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-5 h-5"
+            >
+              <path
+                d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                {unreadCount}
+              </span>
+            )}
+            <span className="text-[10px] font-medium">Messages</span>
+          </button>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-5 h-5"
+            >
+              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            <span className="text-[10px] font-medium">Profile</span>
+          </button>
+        </div>
+      )}
       {showAuth && (
         <AuthModal
           onClose={() => setShowAuth(false)}
