@@ -692,6 +692,45 @@ const IconUpload = () => (
   </svg>
 );
 
+// ─── PinCopyButton ────────────────────────────────────────────────────────────
+function PinCopyButton({ pin }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(String(pin));
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold px-2 py-1 rounded-lg transition-all"
+      title="Copy your PIN"
+    >
+      {copied ? "✓ Copied" : `PIN: ${pin}`}
+    </button>
+  );
+}
+
+// ─── ExpandableDescription ────────────────────────────────────────────────────
+function ExpandableDescription({ text }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > 120;
+  return (
+    <div>
+      <p className="text-[13px] text-slate-500 leading-relaxed">
+        {isLong && !expanded ? text.slice(0, 120) + "…" : text}
+      </p>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((p) => !p)}
+          className="text-[12px] text-blue-600 hover:text-blue-800 font-medium mt-1"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Chat Window ──────────────────────────────────────────────────────────────
 function ChatWindow({ listing, user, onClose }) {
   const otherName =
@@ -852,11 +891,12 @@ function ChatWindow({ listing, user, onClose }) {
     // For owner: use claimer_id (email of claimer)
     // For non-owner: use owner_email
     // Both sides can always message each other
+    // Both owner and claimer can always message each other
+    // Owner messages go to claimer, claimer messages go to owner
+    // Even if no claimer yet, owner can send messages to the listing thread
     const receiverId = isOwner
-      ? listing.claimer_id || ""
+      ? listing.claimer_id || listing.owner_email || ""
       : listing.owner_email || "";
-    // If receiverId is empty (no claimer yet), owner message still saves but has no receiver
-    // This is expected — message will be visible when someone claims
     const tempId = "temp-" + Date.now();
 
     // STEP 1 — Add to local state INSTANTLY, before any network call
@@ -948,26 +988,9 @@ function ChatWindow({ listing, user, onClose }) {
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {/* Show PIN to claimer directly in chat header */}
-          {listing.verification_pin &&
-            listing.owner_email !== user?.email &&
-            (() => {
-              const [copied, setCopied] = useState(false);
-              return (
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(
-                      String(listing.verification_pin)
-                    );
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 2000);
-                  }}
-                  className="flex items-center gap-1 bg-white/20 hover:bg-white/30 text-white text-[10px] font-bold px-2 py-1 rounded-lg transition-all"
-                  title="Copy your PIN"
-                >
-                  {copied ? "✓ Copied" : `PIN: ${listing.verification_pin}`}
-                </button>
-              );
-            })()}
+          {listing.verification_pin && listing.owner_email !== user?.email && (
+            <PinCopyButton pin={listing.verification_pin} />
+          )}
           <span className="flex items-center gap-1 text-[10px] text-blue-200">
             <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
             Live
@@ -994,7 +1017,9 @@ function ChatWindow({ listing, user, onClose }) {
         ) : (
           messages.map((msg) => {
             const isMe =
-              msg.sender_email === user?.email || msg.sender_id === user?.id;
+              msg.sender_email === user?.email ||
+              msg.sender_id === user?.id ||
+              msg.sender_id === user?.email;
             const isTemp = String(msg.id).startsWith("temp-");
             return (
               <div
@@ -1671,6 +1696,7 @@ function AuthModal({ onClose, onSuccess }) {
   const [fieldErrors, setFieldErrors] = useState({});
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   // ── Username duplicate check state ────────────────────────────────────────
   const [isUsernameTaken, setIsUsernameTaken] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -1776,7 +1802,11 @@ function AuthModal({ onClose, onSuccess }) {
     const recipientOk =
       !isRecipient ||
       (form.institution_domain && (!taxRequired || form.tax_id));
-    const agreementsOk = termsAgreed && privacyAgreed;
+    const isIndividual = ["Individual Donor", "Individual Recipient"].includes(
+      form.account_type
+    );
+    const agreementsOk =
+      termsAgreed && privacyAgreed && (!isIndividual || ageConfirmed);
     const usernameOk =
       !isUsernameTaken && !checkingUsername && form.username.trim().length >= 3;
     return !!(
@@ -2216,18 +2246,19 @@ function AuthModal({ onClose, onSuccess }) {
                 />
                 <p className="text-[12px] text-slate-600 leading-relaxed">
                   I have read and agree to the
-                  <button
-                    type="button"
+                  <a
+                    href="#"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
-                      alert(
-                        "Terms of Service\n\nBy using Equilinkz you agree to use the platform lawfully, provide accurate information, and respect other users. Equilinkz is not liable for physical item transfers."
+                      window.dispatchEvent(
+                        new CustomEvent("equilinkz:openPrivacy")
                       );
                     }}
                     className="text-blue-600 hover:text-blue-800 font-semibold underline"
                   >
                     Terms of Service
-                  </button>
+                  </a>
                   — I confirm all information I provide is accurate and
                   truthful.
                 </p>
@@ -2241,22 +2272,42 @@ function AuthModal({ onClose, onSuccess }) {
                 />
                 <p className="text-[12px] text-slate-600 leading-relaxed">
                   I have read and agree to the
-                  <button
-                    type="button"
+                  <a
+                    href="#"
                     onClick={(e) => {
+                      e.preventDefault();
                       e.stopPropagation();
-                      alert(
-                        "Privacy Policy\n\nEquilinkz collects your name, email, phone, and organization details to facilitate resource transfers. Your phone number may be visible to verified users. We do not sell your data. Data is protected by Supabase Row-Level Security."
+                      window.dispatchEvent(
+                        new CustomEvent("equilinkz:openPrivacy")
                       );
                     }}
                     className="text-blue-600 hover:text-blue-800 font-semibold underline"
                   >
                     Privacy Policy
-                  </button>
+                  </a>
                   — I consent to my data being processed as described. My phone
                   number may be visible to verified users for contact.
                 </p>
               </label>
+              {/* Age confirmation — only for individual accounts */}
+              {["Individual Donor", "Individual Recipient"].includes(
+                form.account_type
+              ) && (
+                <label className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={ageConfirmed}
+                    onChange={(e) => setAgeConfirmed(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                  />
+                  <p className="text-[12px] text-slate-600 leading-relaxed">
+                    I confirm that I am{" "}
+                    <strong>18 years of age or older</strong>. If I am under 18,
+                    I confirm that I have obtained parental or guardian consent
+                    to use this platform.
+                  </p>
+                </label>
+              )}
               {mode === "signup" && (!termsAgreed || !privacyAgreed) && (
                 <p className="text-[11px] text-slate-400 text-center">
                   Please agree to both policies to create your account
@@ -2431,6 +2482,8 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose }) {
         `Transfer of "${listing.title}" is complete. Thank you for using Equilinkz!`,
         listing.id
       );
+      // Increment donor's transfer count for verified badge
+      incrementDonorTransfers(listing.owner_email, getToken());
       setTimeout(() => {
         onVerified(listing.id);
         onClose();
@@ -3180,6 +3233,51 @@ function Hero({ onBrowse, onDonate }) {
 // No-op — units transferred is now counted directly from transferred listings
 function incrementUnitsTransferred() {}
 
+// ─── Donor Transfer Counter ───────────────────────────────────────────────────
+async function incrementDonorTransfers(ownerEmail, token) {
+  if (!ownerEmail) return;
+  try {
+    // Fetch current count
+    const res = await fetch(
+      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
+        ownerEmail
+      )}&select=transfers_completed`,
+      { headers: getHeaders(token) }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    const current = (Array.isArray(data) && data[0]?.transfers_completed) || 0;
+    // Increment
+    await fetch(
+      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}`,
+      {
+        method: "PATCH",
+        headers: getHeaders(token),
+        body: JSON.stringify({ transfers_completed: current + 1 }),
+      }
+    );
+  } catch (e) {
+    console.warn("Could not update donor transfer count:", e.message);
+  }
+}
+
+async function fetchDonorTransferCount(ownerEmail) {
+  if (!ownerEmail) return 0;
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
+        ownerEmail
+      )}&select=transfers_completed`,
+      { headers: getHeaders(null) }
+    );
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return (Array.isArray(data) && data[0]?.transfers_completed) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 function AnalyticsBar({ listings, transferredCount }) {
   return (
     <div className="grid grid-cols-3 gap-3 mb-8">
@@ -3576,9 +3674,12 @@ function ListingCard({
                 {ownerBadge.label}
               </span>
             )}
-            {listing.owner_type === "Corporate/Lab Donor" && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700">
-                ✓ Verified
+            {listing.owner_transfers_completed >= 3 && (
+              <span
+                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700"
+                title="Completed 3+ verified transfers"
+              >
+                ✓ Trusted Donor
               </span>
             )}
             {isClaimed && (
@@ -3593,28 +3694,9 @@ function ListingCard({
             )}
           </div>
 
-          {listing.description &&
-            (() => {
-              const [expanded, setExpanded] = useState(false);
-              const isLong = listing.description.length > 120;
-              return (
-                <div>
-                  <p className="text-[13px] text-slate-500 leading-relaxed">
-                    {isLong && !expanded
-                      ? listing.description.slice(0, 120) + "…"
-                      : listing.description}
-                  </p>
-                  {isLong && (
-                    <button
-                      onClick={() => setExpanded((p) => !p)}
-                      className="text-[12px] text-blue-600 hover:text-blue-800 font-medium mt-1"
-                    >
-                      {expanded ? "Show less" : "Show more"}
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
+          {listing.description && (
+            <ExpandableDescription text={listing.description} />
+          )}
 
           <div className="flex items-center gap-3 text-[12px] text-slate-400 flex-wrap">
             {listing.quantity && (
@@ -3663,14 +3745,17 @@ function ListingCard({
                     <IconEmail /> {listing.owner_email}
                   </a>
                 )}
-                {listing.owner_phone && (
-                  <a
-                    href={`tel:${listing.owner_phone}`}
-                    className="flex items-center gap-2 text-[12px] text-green-600 hover:text-green-800 font-medium"
-                  >
-                    <IconPhone /> {listing.owner_phone}
-                  </a>
-                )}
+                {listing.owner_phone &&
+                  user &&
+                  (user.email === listing.owner_email ||
+                    user.email === listing.claimer_id) && (
+                    <a
+                      href={`tel:${listing.owner_phone}`}
+                      className="flex items-center gap-2 text-[12px] text-green-600 hover:text-green-800 font-medium"
+                    >
+                      <IconPhone /> {listing.owner_phone}
+                    </a>
+                  )}
                 {!listing.owner_email && !listing.owner_phone && (
                   <p className="text-[12px] text-slate-400 italic">
                     No contact info provided.
@@ -3869,10 +3954,18 @@ function ListingCard({
             <h3 className="text-[16px] font-bold text-slate-900 mb-1">
               Medical Supplies Request
             </h3>
-            <p className="text-[13px] text-slate-500 mb-4 leading-relaxed">
+            <p className="text-[13px] text-slate-500 mb-2 leading-relaxed">
               For safety, please briefly explain why your organization needs
               these medical supplies (max 60 words).
             </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
+              <p className="text-[11px] text-amber-700 font-medium">
+                ⚠️ Disclaimer: Equilinkz does not verify the safety or
+                suitability of medical supplies. All transfers are at the
+                recipient's own risk. Consult a qualified medical professional
+                before use.
+              </p>
+            </div>
             <textarea
               value={medReason}
               onChange={(e) => {
@@ -4118,102 +4211,6 @@ function ListingsSection({
     </>
   );
 
-  // ── Shared toolbar (search + filters) ────────────────────────────────────
-  const FilterToolbar = () => (
-    <>
-      <div className="relative mb-4">
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-          <IconSearch />
-        </div>
-        <input
-          value={searchInput}
-          onChange={(e) => {
-            setSearchInput(e.target.value);
-            clearTimeout(searchDebounce.current);
-            searchDebounce.current = setTimeout(
-              () => setSearchQuery(e.target.value),
-              300
-            );
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              clearTimeout(searchDebounce.current);
-              setSearchQuery(searchInput);
-              e.target.blur();
-            }
-          }}
-          placeholder="Search by title, description, or organization…"
-          className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 shadow-sm"
-        />
-        {searchInput && (
-          <button
-            onClick={() => {
-              setSearchInput("");
-              setSearchQuery("");
-            }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-          >
-            <IconX />
-          </button>
-        )}
-      </div>
-      <div
-        className="flex gap-2 mb-3 overflow-x-auto pb-2 scrollbar-hide"
-        style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-      >
-        {["All", ...CATEGORIES].map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setCatFilter(cat)}
-            className={`text-[12px] font-medium px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
-              catFilter === cat
-                ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200"
-                : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <span className="text-[12px] font-medium text-slate-500 shrink-0">
-            📍 Region:
-          </span>
-          <select
-            value={regionFilter}
-            onChange={(e) => setRegionFilter(e.target.value)}
-            className="text-[12px] font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          >
-            {REGIONS.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2 flex-1">
-          <span className="text-[12px] font-medium text-slate-500 shrink-0">
-            🔍 Location:
-          </span>
-          <input
-            value={locationInput}
-            onChange={(e) => {
-              setLocationInput(e.target.value);
-              clearTimeout(locationDebounce.current);
-              locationDebounce.current = setTimeout(
-                () => setLocationSearch(e.target.value),
-                300
-              );
-            }}
-            placeholder="Search city, zip, or area…"
-            className="flex-1 text-[12px] border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-      </div>
-    </>
-  );
-
   // ════════════════════════════════════════════════════════════════════════════
   // VIEW: FULL-SCREEN MARKETPLACE
   // ════════════════════════════════════════════════════════════════════════════
@@ -4297,7 +4294,99 @@ function ListingsSection({
           {!loading && !error && <GeoMapSection listings={listings} />}
 
           {/* Full filter toolbar */}
-          <FilterToolbar />
+          {/* Search */}
+          <div className="relative mb-4">
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+              <IconSearch />
+            </div>
+            <input
+              value={searchInput}
+              onChange={(e) => {
+                setSearchInput(e.target.value);
+                clearTimeout(searchDebounce.current);
+                searchDebounce.current = setTimeout(
+                  () => setSearchQuery(e.target.value),
+                  300
+                );
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  clearTimeout(searchDebounce.current);
+                  setSearchQuery(searchInput);
+                  e.target.blur();
+                }
+              }}
+              placeholder="Search by title, description, or organization…"
+              className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 shadow-sm"
+            />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchQuery("");
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              >
+                <IconX />
+              </button>
+            )}
+          </div>
+          {/* Category pills */}
+          <div
+            className="flex gap-2 mb-3 overflow-x-auto pb-2"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {["All", ...CATEGORIES].map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCatFilter(cat)}
+                className={`text-[12px] font-medium px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
+                  catFilter === cat
+                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200"
+                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+          {/* Region + Location */}
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] font-medium text-slate-500 shrink-0">
+                📍 Region:
+              </span>
+              <select
+                value={regionFilter}
+                onChange={(e) => setRegionFilter(e.target.value)}
+                className="text-[12px] font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                {REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 flex-1">
+              <span className="text-[12px] font-medium text-slate-500 shrink-0">
+                🔍 Location:
+              </span>
+              <input
+                value={locationInput}
+                onChange={(e) => {
+                  setLocationInput(e.target.value);
+                  clearTimeout(locationDebounce.current);
+                  locationDebounce.current = setTimeout(
+                    () => setLocationSearch(e.target.value),
+                    300
+                  );
+                }}
+                placeholder="Search city, zip, or area…"
+                className="flex-1 text-[12px] border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
 
           {/* Full scrolling card grid */}
           <CardGrid items={paginatedListings} />
@@ -5000,46 +5089,46 @@ function MissionSection() {
 function PartnersSection() {
   const partners = [
     {
-      name: "TechCorp Global",
+      name: "Global Tech Donor A",
       type: "Corporate Donor",
       region: "North America",
-      items: 240,
-      logo: "TC",
+      items: null,
+      logo: "GT",
     },
     {
-      name: "Lincoln Unified USD",
+      name: "Community School B",
       type: "School District",
-      region: "California",
-      items: 180,
-      logo: "LU",
-    },
-    {
-      name: "Hope Foundation",
-      type: "Non-Profit",
       region: "East Africa",
-      items: 95,
-      logo: "HF",
+      items: null,
+      logo: "CS",
     },
     {
-      name: "Meridian Labs",
-      type: "Research Institution",
-      region: "Europe",
-      items: 310,
-      logo: "ML",
-    },
-    {
-      name: "GreenBridge NGO",
+      name: "Aid Foundation C",
       type: "Non-Profit",
       region: "South Asia",
-      items: 72,
-      logo: "GB",
+      items: null,
+      logo: "AF",
     },
     {
-      name: "AcuTech Industries",
+      name: "Research Institute D",
+      type: "Research Institution",
+      region: "Europe",
+      items: null,
+      logo: "RI",
+    },
+    {
+      name: "NGO Partner E",
+      type: "Non-Profit",
+      region: "Middle East",
+      items: null,
+      logo: "NP",
+    },
+    {
+      name: "Tech Company F",
       type: "Corporate Donor",
       region: "Asia Pacific",
-      items: 425,
-      logo: "AT",
+      items: null,
+      logo: "TC",
     },
   ];
   return (
@@ -5082,7 +5171,9 @@ function PartnersSection() {
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-[12px] text-slate-500">
-                  {p.items.toLocaleString()} items contributed
+                  {p.items
+                    ? p.items.toLocaleString() + " items contributed"
+                    : "Partner organization"}
                 </span>
                 <span className="text-[11px] font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
                   Active Partner
@@ -5296,11 +5387,17 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   const handleAuthSuccess = (u) => {
-    // Set seen timestamp so new user starts with clean unread count
     localStorage.setItem("eq_msgs_seen_" + u.email, new Date().toISOString());
     setUser(u);
     setShowAuth(false);
   };
+
+  // Listen for privacy modal open event from ToS/Privacy links inside AuthModal
+  useEffect(() => {
+    const handler = () => setShowPrivacy(true);
+    window.addEventListener("equilinkz:openPrivacy", handler);
+    return () => window.removeEventListener("equilinkz:openPrivacy", handler);
+  }, []);
   const handleSignOut = () => {
     const email = user?.email;
     localStorage.removeItem("eq_token");
