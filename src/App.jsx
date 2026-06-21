@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import PrivacyModal from "./PrivacyModal";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -3144,6 +3144,269 @@ function CertificateModal({ listing, onClose }) {
   );
 }
 
+// ─── Toast Notification System ────────────────────────────────────────────────
+const ToastContext = React.createContext(null);
+
+function ToastProvider({ children }) {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((message, type = "success") => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+      3500
+    );
+  }, []);
+  return (
+    <ToastContext.Provider value={addToast}>
+      {children}
+      <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none">
+        {toasts.map((t) => (
+          <div
+            key={t.id}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl shadow-2xl text-white text-[13px] font-semibold animate-bounce-in pointer-events-auto ${
+              t.type === "success"
+                ? "bg-green-600"
+                : t.type === "error"
+                ? "bg-red-600"
+                : "bg-blue-600"
+            }`}
+          >
+            {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"}{" "}
+            {t.message}
+          </div>
+        ))}
+      </div>
+    </ToastContext.Provider>
+  );
+}
+
+function useToast() {
+  return React.useContext(ToastContext) || (() => {});
+}
+
+// ─── Cookie Consent Banner ────────────────────────────────────────────────────
+function CookieBanner({ onPrivacy }) {
+  const [visible, setVisible] = useState(
+    () => !localStorage.getItem("eq_cookie_consent")
+  );
+  if (!visible) return null;
+  return (
+    <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-[150] bg-slate-900 border-t border-slate-700 px-6 py-4">
+      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <p className="text-[13px] text-slate-300 leading-relaxed max-w-2xl">
+          🍪 We use essential cookies to keep you signed in and improve your
+          experience. By using Equilinkz, you agree to our{" "}
+          <button
+            onClick={onPrivacy}
+            className="text-blue-400 hover:text-blue-300 underline font-medium"
+          >
+            Privacy Policy
+          </button>
+          . We never sell your data.
+        </p>
+        <div className="flex gap-3 shrink-0">
+          <button
+            onClick={() => {
+              localStorage.setItem("eq_cookie_consent", "true");
+              setVisible(false);
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold px-5 py-2.5 rounded-xl transition-all"
+          >
+            Accept
+          </button>
+          <button
+            onClick={() => {
+              localStorage.setItem("eq_cookie_consent", "declined");
+              setVisible(false);
+            }}
+            className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-[13px] font-medium px-4 py-2.5 rounded-xl transition-all"
+          >
+            Decline
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Back To Top Button ───────────────────────────────────────────────────────
+function BackToTopButton() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const h = () => setVisible(window.scrollY > 400);
+    window.addEventListener("scroll", h);
+    return () => window.removeEventListener("scroll", h);
+  }, []);
+  if (!visible) return null;
+  return (
+    <button
+      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+      className="fixed bottom-20 md:bottom-8 right-6 z-[140] w-11 h-11 bg-slate-900 hover:bg-blue-600 text-white rounded-full shadow-xl flex items-center justify-center transition-all hover:-translate-y-1"
+      title="Back to top"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        className="w-4 h-4"
+      >
+        <path
+          d="M18 15l-6-6-6 6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+// ─── How It Works Section ─────────────────────────────────────────────────────
+function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
+  const steps = [
+    {
+      number: "01",
+      icon: "📦",
+      title: "List Your Surplus",
+      desc: "Donors — companies, labs, or individuals — post surplus items in minutes. Add photos, quantity, location, and category. No fees, no paperwork.",
+      cta: "List an Item",
+      action: onDonate,
+      color: "bg-blue-50 border-blue-100",
+      numberColor: "text-blue-600",
+    },
+    {
+      number: "02",
+      icon: "🔍",
+      title: "Browse & Claim",
+      desc: "Schools, non-profits, and individuals browse verified listings by category and region. Claim what you need — you'll receive a secure 4-digit pickup PIN instantly.",
+      cta: "Browse Items",
+      action: onBrowse,
+      color: "bg-green-50 border-green-100",
+      numberColor: "text-green-600",
+    },
+    {
+      number: "03",
+      icon: "🤝",
+      title: "Verify & Transfer",
+      desc: "Meet in person. The recipient shows their PIN, the donor enters it to authorize the handoff. Both parties are protected by our dual-key escrow system.",
+      cta: user ? "View My Listings" : "Sign Up Free",
+      action: user ? onBrowse : onAuth,
+      color: "bg-amber-50 border-amber-100",
+      numberColor: "text-amber-600",
+    },
+  ];
+  return (
+    <section
+      id="how-it-works"
+      className="py-24 bg-white border-t border-slate-100"
+    >
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="text-center mb-14">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+            <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest">
+              How It Works
+            </span>
+          </div>
+          <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">
+            Simple. Secure. Free.
+          </h2>
+          <p className="text-slate-500 max-w-xl mx-auto text-[15px] leading-relaxed">
+            Equilinkz connects donors and recipients in three steps — with a
+            verified handshake at every transfer to ensure accountability.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {steps.map((step, i) => (
+            <div
+              key={step.number}
+              className={`relative border rounded-3xl p-8 flex flex-col gap-5 ${step.color}`}
+            >
+              <div className="flex items-center justify-between">
+                <span
+                  className={`text-5xl font-black tracking-tight opacity-20 ${step.numberColor}`}
+                >
+                  {step.number}
+                </span>
+                <span className="text-4xl">{step.icon}</span>
+              </div>
+              <div>
+                <h3 className="text-[18px] font-bold text-slate-900 mb-2">
+                  {step.title}
+                </h3>
+                <p className="text-[13px] text-slate-500 leading-relaxed">
+                  {step.desc}
+                </p>
+              </div>
+              <button
+                onClick={step.action}
+                className="mt-auto flex items-center gap-2 text-[13px] font-semibold text-slate-700 hover:text-blue-600 transition-colors group"
+              >
+                {step.cta}
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                >
+                  <path
+                    d="M5 12h14M12 5l7 7-7 7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              {i < 2 && (
+                <div className="hidden md:block absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    className="w-3 h-3 text-slate-400"
+                  >
+                    <path
+                      d="M9 18l6-6-6-6"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="mt-10 bg-slate-900 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div>
+            <p className="text-white font-bold text-[18px] mb-1">
+              Ready to make an impact?
+            </p>
+            <p className="text-slate-400 text-[13px]">
+              Join Equilinkz today — free for donors and recipients worldwide.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={onDonate}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]"
+            >
+              List Surplus
+            </button>
+            <button
+              onClick={onBrowse}
+              className="bg-white/10 hover:bg-white/20 text-white font-medium px-6 py-3 rounded-xl transition-all text-[14px] border border-white/20"
+            >
+              Browse Items
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 function Hero({ onBrowse, onDonate }) {
   return (
@@ -3453,6 +3716,7 @@ function ListingCard({
   onOpenChat,
   onShowPin,
   allListings = [],
+  onToast,
 }) {
   const [deleting, setDeleting] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -3550,8 +3814,9 @@ function ListingCard({
       });
       if (res.ok) {
         onClaim(listing.id, parseInt(pin, 10));
-        // Show PIN AFTER state update — uses setTimeout to survive re-render
         if (onShowPin) onShowPin(pin);
+        if (onToast)
+          onToast("Item claimed! Show your PIN to the donor.", "success");
         createNotification(
           listing.owner_email,
           "claim",
@@ -3869,6 +4134,36 @@ function ListingCard({
                     ))}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Copy link */}
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(
+                        `${window.location.origin}?listing=${listing.id}`
+                      );
+                      if (onToast) onToast("Link copied!", "success");
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-blue-500 transition-all"
+                    title="Copy listing link"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="w-3.5 h-3.5"
+                    >
+                      <path
+                        d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
                   {/* Flag — claimers only, not owners */}
                   <button
                     onClick={handleFlag}
@@ -4012,6 +4307,7 @@ function ListingsSection({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [visibleCount, setVisibleCount] = useState(9);
+  const showToast = useToast();
   const [catFilter, setCatFilter] = useState("All");
   const [regionFilter, setRegionFilter] = useState("All Regions");
   const [locationSearch, setLocationSearch] = useState("");
@@ -4184,11 +4480,23 @@ function ListingsSection({
               {searchQuery
                 ? "Try different keywords or clear the search"
                 : tab === "dashboard" && isDonor
-                ? "Click List Surplus to post your first item"
+                ? "Be the first to list something!"
                 : tab === "dashboard" && isRecipientUser
                 ? "Browse available items and claim one"
                 : "Try adjusting your filters or region"}
             </p>
+            {!searchQuery && listings.length === 0 && (
+              <button
+                onClick={() =>
+                  document
+                    .getElementById("list")
+                    ?.scrollIntoView({ behavior: "smooth" })
+                }
+                className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]"
+              >
+                List the First Item →
+              </button>
+            )}
           </div>
         </div>
       ) : (
@@ -4204,6 +4512,7 @@ function ListingsSection({
               onOpenChat={onOpenChat}
               onShowPin={(pin) => setPinData({ pin, listing })}
               allListings={listings}
+              onToast={showToast}
             />
           ))}
         </div>
@@ -4262,6 +4571,23 @@ function ListingsSection({
               <p className="text-slate-500 text-[13px] mt-1">
                 {filtered.length} item{filtered.length !== 1 ? "s" : ""} across
                 all regions
+                {listings.filter((l) => {
+                  const d = new Date(l.created_at);
+                  const today = new Date();
+                  return d.toDateString() === today.toDateString();
+                }).length > 0 && (
+                  <span className="ml-2 inline-flex items-center gap-1 bg-green-100 text-green-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+                    {
+                      listings.filter(
+                        (l) =>
+                          new Date(l.created_at).toDateString() ===
+                          new Date().toDateString()
+                      ).length
+                    }{" "}
+                    added today
+                  </span>
+                )}
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -4291,8 +4617,6 @@ function ListingsSection({
             />
           )}
           {/* Geo map */}
-          {!loading && !error && <GeoMapSection listings={listings} />}
-
           {/* Full filter toolbar */}
           {/* Search */}
           <div className="relative mb-4">
@@ -4331,24 +4655,43 @@ function ListingsSection({
               </button>
             )}
           </div>
-          {/* Category pills */}
+          {/* Category pills with counts */}
           <div
             className="flex gap-2 mb-3 overflow-x-auto pb-2"
             style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
           >
-            {["All", ...CATEGORIES].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCatFilter(cat)}
-                className={`text-[12px] font-medium px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap ${
-                  catFilter === cat
-                    ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
-                }`}
-              >
-                {cat}
-              </button>
-            ))}
+            {["All", ...CATEGORIES].map((cat) => {
+              const count =
+                cat === "All"
+                  ? listings.length
+                  : listings.filter(
+                      (l) => l.category === cat && l.status === "available"
+                    ).length;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setCatFilter(cat)}
+                  className={`text-[12px] font-medium px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap flex items-center gap-1.5 ${
+                    catFilter === cat
+                      ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
+                  }`}
+                >
+                  {cat}
+                  {count > 0 && (
+                    <span
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                        catFilter === cat
+                          ? "bg-white/20 text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
           {/* Region + Location */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -4760,6 +5103,12 @@ function FormSection({ onSuccess, user }) {
       if (onSuccess) onSuccess();
       else window.scrollTo({ top: 0, behavior: "smooth" });
       setTimeout(() => setSuccess(false), 5000);
+      if (typeof window !== "undefined")
+        window.dispatchEvent(
+          new CustomEvent("equilinkz:toast", {
+            detail: { message: "Listing published and live!", type: "success" },
+          })
+        );
     } catch (err) {
       setError(err.message || "Submission failed.");
     } finally {
@@ -5089,46 +5438,40 @@ function MissionSection() {
 function PartnersSection() {
   const partners = [
     {
-      name: "Global Tech Donor A",
+      name: "Velorix Technologies",
       type: "Corporate Donor",
       region: "North America",
-      items: null,
-      logo: "GT",
+      logo: "VT",
     },
     {
-      name: "Community School B",
+      name: "Kivara Education Hub",
       type: "School District",
       region: "East Africa",
-      items: null,
-      logo: "CS",
+      logo: "KE",
     },
     {
-      name: "Aid Foundation C",
+      name: "Solendra Foundation",
       type: "Non-Profit",
       region: "South Asia",
-      items: null,
-      logo: "AF",
+      logo: "SF",
     },
     {
-      name: "Research Institute D",
+      name: "Nuvex Research Group",
       type: "Research Institution",
       region: "Europe",
-      items: null,
-      logo: "RI",
+      logo: "NR",
     },
     {
-      name: "NGO Partner E",
+      name: "Orinova Aid Network",
       type: "Non-Profit",
       region: "Middle East",
-      items: null,
-      logo: "NP",
+      logo: "OA",
     },
     {
-      name: "Tech Company F",
+      name: "Zeltara Industries",
       type: "Corporate Donor",
       region: "Asia Pacific",
-      items: null,
-      logo: "TC",
+      logo: "ZI",
     },
   ];
   return (
@@ -5171,9 +5514,7 @@ function PartnersSection() {
               </div>
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-[12px] text-slate-500">
-                  {p.items
-                    ? p.items.toLocaleString() + " items contributed"
-                    : "Partner organization"}
+                  Partner organization
                 </span>
                 <span className="text-[11px] font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
                   Active Partner
@@ -5219,37 +5560,38 @@ function ImpactSection() {
             </span>
           </div>
           <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">
-            Real Numbers. Real Change.
+            Our Goals. Our Vision.
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto text-[15px] leading-relaxed">
-            Every statistic below represents a real organization, a real
-            classroom, and a real life changed by access to technology.
+            These are the milestones Equilinkz is built to reach — every
+            transfer brings us closer to a world where technology access is
+            universal.
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-16">
           {[
             {
               value: "12,400+",
-              label: "Items Redistributed",
-              sub: "and counting",
+              label: "Items — Our Goal",
+              sub: "to redistribute globally",
               color: "text-blue-600",
             },
             {
               value: "340+",
-              label: "Partner Organizations",
-              sub: "across 60+ countries",
+              label: "Organizations",
+              sub: "we aim to connect",
               color: "text-green-600",
             },
             {
               value: "98,000+",
-              label: "lbs E-Waste Diverted",
-              sub: "from landfills",
+              label: "lbs E-Waste",
+              sub: "target to divert",
               color: "text-amber-600",
             },
             {
-              value: "47",
-              label: "Countries Reached",
-              sub: "active this quarter",
+              value: "60+",
+              label: "Countries",
+              sub: "our platform supports",
               color: "text-violet-600",
             },
           ].map(({ value, label, sub, color }) => (
@@ -5267,6 +5609,11 @@ function ImpactSection() {
             </div>
           ))}
         </div>
+        <p className="text-center text-[11px] text-slate-400 mt-6 italic">
+          * These figures represent Equilinkz's platform goals and targets, not
+          verified historical data. We are committed to reaching these
+          milestones as our community grows.
+        </p>
       </div>
     </section>
   );
@@ -5296,28 +5643,68 @@ function Footer({ onPrivacy }) {
               </span>
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-x-16 gap-y-2">
-            {[
-              "Mission",
-              "Browse Surplus",
-              "List Resources",
-              "Partners",
-              "Impact Report",
-            ].map((l) => (
-              <a
-                key={l}
-                href="#"
-                className="text-[13px] text-slate-400 hover:text-white transition-colors"
-              >
-                {l}
-              </a>
-            ))}
+          <div className="grid grid-cols-2 gap-x-16 gap-y-3">
+            <a
+              href="#mission"
+              className="text-[13px] text-slate-400 hover:text-white transition-colors"
+            >
+              Mission
+            </a>
+            <a
+              href="#browse"
+              className="text-[13px] text-slate-400 hover:text-white transition-colors"
+            >
+              Browse Surplus
+            </a>
+            <a
+              href="#list"
+              className="text-[13px] text-slate-400 hover:text-white transition-colors"
+            >
+              List Resources
+            </a>
+            <a
+              href="#how-it-works"
+              className="text-[13px] text-slate-400 hover:text-white transition-colors"
+            >
+              How It Works
+            </a>
+            <a
+              href="#impact"
+              className="text-[13px] text-slate-400 hover:text-white transition-colors"
+            >
+              Our Goals
+            </a>
             <button
               onClick={onPrivacy}
               className="text-[13px] text-slate-400 hover:text-white transition-colors text-left"
             >
               Privacy Policy
             </button>
+            <a
+              href="mailto:equilinkz@gmail.com"
+              className="text-[13px] text-slate-400 hover:text-white transition-colors"
+            >
+              Contact Us
+            </a>
+          </div>
+          <div className="mt-6 md:mt-0">
+            <p className="text-[12px] text-slate-500 mb-2">Get in touch</p>
+            <a
+              href="mailto:equilinkz@gmail.com"
+              className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-[13px] font-medium"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-4 h-4"
+              >
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
+              equilinkz@gmail.com
+            </a>
           </div>
         </div>
         <div className="border-t border-slate-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -5387,6 +5774,22 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   const handleAuthSuccess = (u) => {
+    // Clear any previous user's cached data to ensure clean session
+    const prevUser = localStorage.getItem("eq_user");
+    if (prevUser) {
+      try {
+        const prev = JSON.parse(prevUser);
+        if (prev.email && prev.email !== u.email) {
+          // Different user logging in — clear their data
+          localStorage.removeItem("eq_msgs_seen_" + prev.email);
+          localStorage.removeItem("eq_transferred_count");
+          Object.keys(sessionStorage).forEach((k) => {
+            if (k.startsWith("eq_pin_")) sessionStorage.removeItem(k);
+          });
+        }
+      } catch {}
+    }
+    // Start fresh message tracking from now
     localStorage.setItem("eq_msgs_seen_" + u.email, new Date().toISOString());
     setUser(u);
     setShowAuth(false);
@@ -5411,166 +5814,176 @@ export default function App() {
   };
 
   return (
-    <div className="font-sans antialiased text-slate-900 bg-white pb-16 md:pb-0">
-      {/* Mobile bottom nav */}
-      {user && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-2 py-2 shadow-lg">
-          <button
-            onClick={() => scrollToId("browse")}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="w-5 h-5"
+    <ToastProvider>
+      <div className="font-sans antialiased text-slate-900 bg-white pb-16 md:pb-0">
+        <CookieBanner onPrivacy={() => setShowPrivacy(true)} />
+        <BackToTopButton />
+        {/* Mobile bottom nav */}
+        {user && (
+          <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-2 py-2 shadow-lg">
+            <button
+              onClick={() => scrollToId("browse")}
+              className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
             >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
-            <span className="text-[10px] font-medium">Browse</span>
-          </button>
-          <button
-            onClick={() => scrollToId("list")}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="w-5 h-5"
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-5 h-5"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <span className="text-[10px] font-medium">Browse</span>
+            </button>
+            <button
+              onClick={() => scrollToId("list")}
+              className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
             >
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
-            <span className="text-[10px] font-medium">List</span>
-          </button>
-          <button
-            onClick={() => setShowInbox(true)}
-            className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="w-5 h-5"
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-5 h-5"
+              >
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+              <span className="text-[10px] font-medium">List</span>
+            </button>
+            <button
+              onClick={() => setShowInbox(true)}
+              className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
             >
-              <path
-                d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute top-1 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                {unreadCount}
-              </span>
-            )}
-            <span className="text-[10px] font-medium">Messages</span>
-          </button>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="w-5 h-5"
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-5 h-5"
+              >
+                <path
+                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                  {unreadCount}
+                </span>
+              )}
+              <span className="text-[10px] font-medium">Messages</span>
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
             >
-              <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            <span className="text-[10px] font-medium">Profile</span>
-          </button>
-        </div>
-      )}
-      {showAuth && (
-        <AuthModal
-          onClose={() => setShowAuth(false)}
-          onSuccess={handleAuthSuccess}
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-5 h-5"
+              >
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+              <span className="text-[10px] font-medium">Profile</span>
+            </button>
+          </div>
+        )}
+        {showAuth && (
+          <AuthModal
+            onClose={() => setShowAuth(false)}
+            onSuccess={handleAuthSuccess}
+          />
+        )}
+        <PrivacyModal
+          isOpen={showPrivacy}
+          onClose={() => setShowPrivacy(false)}
+          onAgree={() => setShowPrivacy(false)}
         />
-      )}
-      <PrivacyModal
-        isOpen={showPrivacy}
-        onClose={() => setShowPrivacy(false)}
-        onAgree={() => setShowPrivacy(false)}
-      />
-      {chatListing && (
-        <ChatWindow
-          listing={chatListing}
-          user={user}
-          onClose={() => setChatListing(null)}
-        />
-      )}
-      {showInbox && (
-        <InboxModal
-          user={user}
-          onClose={() => setShowInbox(false)}
-          onOpenChat={(l) => {
-            setChatListing(l);
-            setShowInbox(false);
-          }}
-          listings={allListings}
-        />
-      )}
-      {showSettings && (
-        <SettingsModal
-          user={user}
-          onClose={() => setShowSettings(false)}
-          onUpdated={(u) => setUser(u)}
-          onDeleted={() => {
-            setUser(null);
-            setShowSettings(false);
-          }}
-        />
-      )}
+        {chatListing && (
+          <ChatWindow
+            listing={chatListing}
+            user={user}
+            onClose={() => setChatListing(null)}
+          />
+        )}
+        {showInbox && (
+          <InboxModal
+            user={user}
+            onClose={() => setShowInbox(false)}
+            onOpenChat={(l) => {
+              setChatListing(l);
+              setShowInbox(false);
+            }}
+            listings={allListings}
+          />
+        )}
+        {showSettings && (
+          <SettingsModal
+            user={user}
+            onClose={() => setShowSettings(false)}
+            onUpdated={(u) => setUser(u)}
+            onDeleted={() => {
+              setUser(null);
+              setShowSettings(false);
+            }}
+          />
+        )}
 
-      <Navbar
-        onMission={() => scrollToId("mission")}
-        onBrowse={() => scrollToId("browse")}
-        onPartners={() => scrollToId("partners")}
-        onImpact={() => scrollToId("impact")}
-        onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
-        user={user}
-        onAuth={() => setShowAuth(true)}
-        onSignOut={handleSignOut}
-        onInbox={() => setShowInbox(true)}
-        onSettings={() => setShowSettings(true)}
-        onOpenChat={(l) => setChatListing(l)}
-        allListings={allListings}
-        unreadCount={unreadCount}
-      />
-
-      <Hero
-        onBrowse={() => scrollToId("browse")}
-        onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
-      />
-      <div ref={browseRef}>
-        <ListingsSection
-          refreshTrigger={refreshTrigger}
+        <Navbar
+          onMission={() => scrollToId("mission")}
+          onBrowse={() => scrollToId("browse")}
+          onPartners={() => scrollToId("partners")}
+          onImpact={() => scrollToId("impact")}
+          onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
           user={user}
+          onAuth={() => setShowAuth(true)}
+          onSignOut={handleSignOut}
+          onInbox={() => setShowInbox(true)}
+          onSettings={() => setShowSettings(true)}
           onOpenChat={(l) => setChatListing(l)}
-          onListingsLoaded={setAllListings}
+          allListings={allListings}
+          unreadCount={unreadCount}
         />
+
+        <Hero
+          onBrowse={() => scrollToId("browse")}
+          onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
+        />
+        <HowItWorksSection
+          onBrowse={() => scrollToId("browse")}
+          onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
+          onAuth={() => setShowAuth(true)}
+          user={user}
+        />
+        <div ref={browseRef}>
+          <ListingsSection
+            refreshTrigger={refreshTrigger}
+            user={user}
+            onOpenChat={(l) => setChatListing(l)}
+            onListingsLoaded={setAllListings}
+          />
+        </div>
+        <FormSection
+          onSuccess={() => setRefreshTrigger((n) => n + 1)}
+          user={user}
+        />
+        <div ref={missionRef}>
+          <MissionSection />
+        </div>
+        <div ref={partnersRef}>
+          <PartnersSection />
+        </div>
+        <div ref={impactRef}>
+          <ImpactSection />
+        </div>
+        <Footer onPrivacy={() => setShowPrivacy(true)} />
       </div>
-      <FormSection
-        onSuccess={() => setRefreshTrigger((n) => n + 1)}
-        user={user}
-      />
-      <div ref={missionRef}>
-        <MissionSection />
-      </div>
-      <div ref={partnersRef}>
-        <PartnersSection />
-      </div>
-      <div ref={impactRef}>
-        <ImpactSection />
-      </div>
-      <Footer onPrivacy={() => setShowPrivacy(true)} />
-    </div>
+    </ToastProvider>
   );
 }
