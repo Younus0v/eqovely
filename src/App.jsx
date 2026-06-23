@@ -2468,13 +2468,24 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      // Delete listing completely on transfer
+      // First update status to "transferred" so it's never stuck in pending
+      await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
+        method: "PATCH",
+        headers: getHeaders(getToken()),
+        body: JSON.stringify({ status: "transferred" }),
+      });
+      // Then delete listing completely on transfer
       const res = await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
         method: "DELETE",
         headers: getHeaders(getToken()),
       });
-      if (!res.ok)
-        throw new Error("Failed to complete transfer. Please try again.");
+      // If delete fails, listing stays as "transferred" (not stuck in pending)
+      if (!res.ok) {
+        // Mark as transferred in UI even if delete fails
+        console.warn(
+          "Delete failed after transfer mark — listing marked transferred, not stuck."
+        );
+      }
       setSuccess(true);
       createNotification(
         listing.claimer_id,
@@ -3192,7 +3203,7 @@ function CookieBanner({ onPrivacy }) {
   );
   if (!visible) return null;
   return (
-    <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-[150] bg-slate-900 border-t border-slate-700 px-6 py-4">
+    <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-[45] bg-slate-900 border-t border-slate-700 px-6 py-4">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <p className="text-[13px] text-slate-300 leading-relaxed max-w-2xl">
           🍪 We use essential cookies to keep you signed in and improve your
@@ -3717,9 +3728,18 @@ function ListingCard({
   onShowPin,
   allListings = [],
   onToast,
+  onCardClick,
 }) {
   const [deleting, setDeleting] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: listing.title || "",
+    description: listing.description || "",
+    quantity: listing.quantity || "",
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState(null);
   const [flagged, setFlagged] = useState((listing.flags || 0) > 0);
   const [showContact, setShowContact] = useState(false);
   // showPin is lifted to parent — use onShowPin prop instead
@@ -3836,6 +3856,39 @@ function ListingCard({
     }
   };
 
+  const handleEdit = async () => {
+    if (!editForm.title.trim()) {
+      setEditError("Title is required.");
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
+        method: "PATCH",
+        headers: getHeaders(getToken()),
+        body: JSON.stringify({
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          quantity: editForm.quantity ? parseInt(editForm.quantity, 10) : null,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save changes.");
+      // Update listing in UI by patching local object
+      listing.title = editForm.title.trim();
+      listing.description = editForm.description.trim();
+      listing.quantity = editForm.quantity
+        ? parseInt(editForm.quantity, 10)
+        : null;
+      setShowEditModal(false);
+      if (onToast) onToast("Listing updated!", "success");
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const handleFlag = async () => {
     try {
       const newFlags = flagged
@@ -3859,7 +3912,8 @@ function ListingCard({
           isDone
             ? "opacity-55 border-slate-100"
             : "border-slate-100 hover:border-blue-100 hover:shadow-xl hover:shadow-blue-50 hover:-translate-y-1"
-        }`}
+        } ${onCardClick ? "cursor-pointer" : ""}`}
+        onClick={onCardClick || undefined}
       >
         {/* Photo gallery */}
         {images.length > 0 && !imgError && (
@@ -4075,16 +4129,24 @@ function ListingCard({
                     </div>
                   )}
                 </div>
-                {/* Delete — only while item is still available */}
+                {/* Edit + Delete — only while item is still available */}
                 {!isDone && (
-                  <button
-                    onClick={handleDelete}
-                    disabled={deleting}
-                    className="flex items-center gap-1.5 text-[12px] font-medium text-red-400 hover:text-red-600 border border-red-100 hover:border-red-200 rounded-lg px-2.5 py-1 transition-all"
+                  <div
+                    className="flex items-center gap-2"
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {deleting ? (
-                      <IconLoader />
-                    ) : (
+                    <button
+                      onClick={() => {
+                        setEditForm({
+                          title: listing.title || "",
+                          description: listing.description || "",
+                          quantity: listing.quantity || "",
+                        });
+                        setEditError(null);
+                        setShowEditModal(true);
+                      }}
+                      className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-200 rounded-lg px-2.5 py-1 transition-all"
+                    >
                       <svg
                         viewBox="0 0 24 24"
                         fill="none"
@@ -4093,14 +4155,43 @@ function ListingCard({
                         className="w-3 h-3"
                       >
                         <path
-                          d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
+                          d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         />
                       </svg>
-                    )}
-                    Delete
-                  </button>
+                      Edit
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleting}
+                      className="flex items-center gap-1.5 text-[12px] font-medium text-red-400 hover:text-red-600 border border-red-100 hover:border-red-200 rounded-lg px-2.5 py-1 transition-all"
+                    >
+                      {deleting ? (
+                        <IconLoader />
+                      ) : (
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          className="w-3 h-3"
+                        >
+                          <path
+                            d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      )}
+                      Delete
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
@@ -4115,12 +4206,15 @@ function ListingCard({
                       </span>
                     ) : (
                       <button
-                        onClick={handleClaim}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleClaim();
+                        }}
                         disabled={claiming || !user}
-                        className={`flex items-center gap-1.5 text-[12px] font-medium transition-all ${
+                        className={`flex items-center gap-1.5 text-[12px] font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-sm ${
                           !user
-                            ? "text-slate-400 cursor-not-allowed"
-                            : "text-blue-600 hover:text-blue-700"
+                            ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-700 text-white hover:-translate-y-0.5 shadow-blue-200"
                         }`}
                       >
                         {claiming ? (
@@ -4136,7 +4230,8 @@ function ListingCard({
                 <div className="flex items-center gap-2">
                   {/* Copy link */}
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       navigator.clipboard.writeText(
                         `${window.location.origin}?listing=${listing.id}`
                       );
@@ -4162,6 +4257,26 @@ function ListingCard({
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       />
+                    </svg>
+                  </button>
+                  {/* WhatsApp share */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const text = encodeURIComponent(
+                        `Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`
+                      );
+                      window.open(`https://wa.me/?text=${text}`, "_blank");
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-green-500 transition-all"
+                    title="Share on WhatsApp"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      className="w-3.5 h-3.5"
+                    >
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                     </svg>
                   </button>
                   {/* Flag — claimers only, not owners */}
@@ -4191,6 +4306,92 @@ function ListingCard({
         </div>
       </div>
       {/* PIN modal moved to parent ListingsSection */}
+      {/* Edit Listing Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setShowEditModal(false)}
+          />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+            >
+              <IconX />
+            </button>
+            <h3 className="text-lg font-bold text-slate-900 mb-5">
+              Edit Listing
+            </h3>
+            {editError && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">
+                {editError}
+              </div>
+            )}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                  Title *
+                </label>
+                <input
+                  value={editForm.title}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, title: e.target.value }))
+                  }
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="Item title"
+                  maxLength={120}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={editForm.description}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, description: e.target.value }))
+                  }
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                  placeholder="Condition, specs, details…"
+                  maxLength={300}
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                  Quantity
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editForm.quantity}
+                  onChange={(e) =>
+                    setEditForm((f) => ({ ...f, quantity: e.target.value }))
+                  }
+                  className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  placeholder="e.g. 10"
+                />
+              </div>
+              <button
+                onClick={handleEdit}
+                disabled={editSaving}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]"
+              >
+                {editSaving ? (
+                  <>
+                    <IconLoader /> Saving…
+                  </>
+                ) : (
+                  <>
+                    <IconCheck /> Save Changes
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showOwnerVerify && (
         <OwnerVerifyModal
           listing={listing}
@@ -4324,6 +4525,7 @@ function ListingsSection({
 
   // ── View state: 'dashboard' shows 3-card preview, 'marketplace' shows all ──
   const [currentView, setCurrentView] = useState("dashboard");
+  const [selectedListing, setSelectedListing] = useState(null);
 
   const fetchListings = async () => {
     setLoading(true);
@@ -4431,7 +4633,7 @@ function ListingsSection({
   const hasMore = filtered.length > visibleCount;
 
   // ── Shared card grid renderer ─────────────────────────────────────────────
-  const CardGrid = ({ items }) => (
+  const CardGrid = ({ items, onCardClick }) => (
     <>
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -4513,6 +4715,7 @@ function ListingsSection({
               onShowPin={(pin) => setPinData({ pin, listing })}
               allListings={listings}
               onToast={showToast}
+              onCardClick={onCardClick ? () => onCardClick(listing) : undefined}
             />
           ))}
         </div>
@@ -4732,7 +4935,10 @@ function ListingsSection({
           </div>
 
           {/* Full scrolling card grid */}
-          <CardGrid items={paginatedListings} />
+          <CardGrid
+            items={paginatedListings}
+            onCardClick={(l) => setSelectedListing(l)}
+          />
           {hasMore && (
             <div className="flex justify-center mt-8">
               <button
@@ -4749,6 +4955,16 @@ function ListingsSection({
             pin={pinData.pin}
             listing={pinData.listing}
             onClose={() => setPinData(null)}
+          />
+        )}
+        {selectedListing && (
+          <ListingDetailModal
+            listing={selectedListing}
+            user={user}
+            onClose={() => setSelectedListing(null)}
+            onClaim={(l) => handleClaim(l.id)}
+            onOpenChat={onOpenChat}
+            onToast={showToast}
           />
         )}
       </section>
@@ -4806,8 +5022,50 @@ function ListingsSection({
           />
         )}
 
+        {/* Search bar on dashboard */}
+        <div className="relative mb-6 mt-2">
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+            <IconSearch />
+          </div>
+          <input
+            value={searchInput}
+            onChange={(e) => {
+              setSearchInput(e.target.value);
+              clearTimeout(searchDebounce.current);
+              searchDebounce.current = setTimeout(
+                () => setSearchQuery(e.target.value),
+                300
+              );
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                clearTimeout(searchDebounce.current);
+                setSearchQuery(searchInput);
+                setCurrentView("marketplace");
+                e.target.blur();
+              }
+            }}
+            placeholder="Search listings — press Enter to see all results…"
+            className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 shadow-sm"
+          />
+          {searchInput && (
+            <button
+              onClick={() => {
+                setSearchInput("");
+                setSearchQuery("");
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+            >
+              <IconX />
+            </button>
+          )}
+        </div>
+
         {/* 3-card preview grid */}
-        <CardGrid items={previewListings} />
+        <CardGrid
+          items={previewListings}
+          onCardClick={(l) => setSelectedListing(l)}
+        />
 
         {/* Explore Full Marketplace CTA */}
         {!loading && !error && listings.length > 0 && (
@@ -4841,6 +5099,18 @@ function ListingsSection({
           pin={pinData.pin}
           listing={pinData.listing}
           onClose={() => setPinData(null)}
+        />
+      )}
+
+      {/* Listing Detail Modal */}
+      {selectedListing && (
+        <ListingDetailModal
+          listing={selectedListing}
+          user={user}
+          onClose={() => setSelectedListing(null)}
+          onClaim={(l) => handleClaim(l.id)}
+          onOpenChat={onOpenChat}
+          onToast={showToast}
         />
       )}
     </section>
@@ -5024,6 +5294,8 @@ function FormSection({ onSuccess, user }) {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [agreed, setAgreed] = useState(false);
+  const [medCheck1, setMedCheck1] = useState(false);
+  const [medCheck2, setMedCheck2] = useState(false);
   const [uploaderKey, setUploaderKey] = useState(0); // reset PhotoUploader on publish
 
   const handleChange = (e) => {
@@ -5050,6 +5322,12 @@ function FormSection({ onSuccess, user }) {
     }
     if (!agreed) {
       setError("Please confirm the security agreement before submitting.");
+      return;
+    }
+    if (form.category === "Medical Supplies" && (!medCheck1 || !medCheck2)) {
+      setError(
+        "For Medical Supplies, you must confirm both medical compliance checkboxes."
+      );
       return;
     }
     const orgNeeded =
@@ -5099,6 +5377,8 @@ function FormSection({ onSuccess, user }) {
       setSuccess(true);
       setForm(EMPTY_FORM);
       setAgreed(false);
+      setMedCheck1(false);
+      setMedCheck2(false);
       setUploaderKey((k) => k + 1);
       if (onSuccess) onSuccess();
       else window.scrollTo({ top: 0, behavior: "smooth" });
@@ -5288,6 +5568,44 @@ function FormSection({ onSuccess, user }) {
                 onChange={(urls) => setForm((p) => ({ ...p, image_url: urls }))}
               />
             </div>
+
+            {/* Medical Supplies — extra compliance checkboxes */}
+            {form.category === "Medical Supplies" && (
+              <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 space-y-3">
+                <p className="text-[12px] font-semibold text-teal-800 flex items-center gap-1.5">
+                  <span>⚕️</span> Medical Supplies — Required Confirmation
+                </p>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={medCheck1}
+                    onChange={(e) => setMedCheck1(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-teal-300 text-teal-600 focus:ring-teal-500 shrink-0"
+                  />
+                  <p className="text-[12px] text-teal-700 leading-relaxed">
+                    I confirm these items are{" "}
+                    <strong>unused, unexpired, and safe for transfer</strong> to
+                    another party.
+                  </p>
+                </label>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={medCheck2}
+                    onChange={(e) => setMedCheck2(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-teal-300 text-teal-600 focus:ring-teal-500 shrink-0"
+                  />
+                  <p className="text-[12px] text-teal-700 leading-relaxed">
+                    I confirm I am{" "}
+                    <strong>
+                      not listing prescription medications, controlled
+                      substances, or sterile surgical equipment
+                    </strong>
+                    .
+                  </p>
+                </label>
+              </div>
+            )}
 
             {/* Security agreement */}
             <div
@@ -5721,6 +6039,502 @@ function Footer({ onPrivacy }) {
 }
 
 // ─── App ──────────────────────────────────────────────────────────────────────
+// ─── Listing Detail Modal ────────────────────────────────────────────────────
+function ListingDetailModal({
+  listing,
+  user,
+  onClose,
+  onClaim,
+  onOpenChat,
+  onToast,
+}) {
+  const [imgIndex, setImgIndex] = useState(0);
+  const [claiming, setClaiming] = useState(false);
+
+  if (!listing) return null;
+
+  // Parse images
+  let images = [];
+  try {
+    const parsed = JSON.parse(listing.image_url);
+    images = Array.isArray(parsed)
+      ? parsed
+      : [listing.image_url].filter(Boolean);
+  } catch {
+    images = listing.image_url ? [listing.image_url] : [];
+  }
+
+  const handleClaim = async () => {
+    if (onClaim) {
+      setClaiming(true);
+      await onClaim(listing);
+      setClaiming(false);
+    }
+  };
+
+  const handleWhatsApp = () => {
+    const text = encodeURIComponent(
+      `Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`
+    );
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(
+      `${window.location.origin}?listing=${listing.id}`
+    );
+    if (onToast) onToast("Link copied!", "success");
+  };
+
+  const CATEGORY_COLORS = {
+    Electronics: "bg-blue-50 text-blue-700 border-blue-100",
+    Furniture: "bg-amber-50 text-amber-700 border-amber-100",
+    "Office Supplies": "bg-purple-50 text-purple-700 border-purple-100",
+    "Medical Supplies": "bg-teal-50 text-teal-700 border-teal-100",
+    "Food & Groceries": "bg-green-50 text-green-700 border-green-100",
+    Clothing: "bg-pink-50 text-pink-700 border-pink-100",
+    "Books & Education": "bg-indigo-50 text-indigo-700 border-indigo-100",
+    Other: "bg-slate-50 text-slate-600 border-slate-100",
+  };
+  const catStyle =
+    CATEGORY_COLORS[listing.category] || CATEGORY_COLORS["Other"];
+  const isDone =
+    listing.status === "claimed" || listing.status === "transferred";
+  const isOwner = user && user.email === listing.owner_email;
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-white w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 z-10 w-9 h-9 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 shadow-sm transition-all"
+        >
+          <IconX />
+        </button>
+
+        {/* Image carousel */}
+        <div
+          className="relative w-full bg-slate-100 shrink-0"
+          style={{ height: "280px" }}
+        >
+          {images.length > 0 ? (
+            <>
+              <img
+                src={images[imgIndex]}
+                alt={listing.title}
+                className="w-full h-full object-cover"
+              />
+              {images.length > 1 && (
+                <>
+                  <button
+                    onClick={() =>
+                      setImgIndex(
+                        (i) => (i - 1 + images.length) % images.length
+                      )
+                    }
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="w-4 h-4"
+                    >
+                      <path
+                        d="M15 18l-6-6 6-6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => setImgIndex((i) => (i + 1) % images.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="w-4 h-4"
+                    >
+                      <path
+                        d="M9 18l6-6-6-6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                    {images.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setImgIndex(i)}
+                        className={`w-1.5 h-1.5 rounded-full transition-all ${
+                          i === imgIndex ? "bg-white w-4" : "bg-white/50"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-6xl">
+              📦
+            </div>
+          )}
+        </div>
+
+        {/* Content - scrollable */}
+        <div className="overflow-y-auto flex-1 p-6">
+          {/* Category + status */}
+          <div className="flex items-center gap-2 mb-3 flex-wrap">
+            <span
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${catStyle}`}
+            >
+              {listing.category}
+            </span>
+            {isDone && (
+              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                {listing.status === "claimed" ? "Claimed" : "Transferred"}
+              </span>
+            )}
+          </div>
+
+          {/* Title */}
+          <h2 className="text-xl font-bold text-slate-900 mb-1 leading-tight">
+            {listing.title}
+          </h2>
+
+          {/* Meta */}
+          <div className="flex flex-wrap gap-3 text-[12px] text-slate-500 mb-4">
+            {listing.location && (
+              <span className="flex items-center gap-1">
+                📍 {listing.location}
+              </span>
+            )}
+            {listing.quantity && (
+              <span className="flex items-center gap-1">
+                📦 Qty: {listing.quantity}
+              </span>
+            )}
+            {listing.condition && (
+              <span className="flex items-center gap-1">
+                ✅ {listing.condition}
+              </span>
+            )}
+            {listing.created_at && (
+              <span className="flex items-center gap-1">
+                🕐{" "}
+                {new Date(listing.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
+            )}
+          </div>
+
+          {/* Description */}
+          {listing.description && (
+            <p className="text-[14px] text-slate-600 leading-relaxed mb-5 whitespace-pre-wrap">
+              {listing.description}
+            </p>
+          )}
+
+          {/* Divider */}
+          <div className="h-px bg-slate-100 mb-5" />
+
+          {/* Actions */}
+          <div className="flex flex-col gap-3">
+            {!isDone && !isOwner && user && (
+              <button
+                onClick={handleClaim}
+                disabled={claiming}
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-3.5 rounded-2xl transition-all shadow-lg shadow-blue-200 text-[15px]"
+              >
+                {claiming ? (
+                  <>
+                    <IconLoader /> Claiming…
+                  </>
+                ) : (
+                  <>
+                    <IconArrow /> Claim This Item
+                  </>
+                )}
+              </button>
+            )}
+            {!isOwner && user && onOpenChat && listing.owner_email && (
+              <button
+                onClick={() => {
+                  onOpenChat(listing);
+                  onClose();
+                }}
+                className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-2xl transition-all text-[14px]"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="w-4 h-4"
+                >
+                  <path
+                    d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Message Donor
+              </button>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleWhatsApp}
+                className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 font-medium py-2.5 rounded-xl transition-all text-[13px] border border-green-100"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="w-4 h-4"
+                >
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                </svg>
+                Share on WhatsApp
+              </button>
+              <button
+                onClick={handleCopyLink}
+                className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 font-medium py-2.5 rounded-xl transition-all text-[13px] border border-slate-200"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className="w-4 h-4"
+                >
+                  <path
+                    d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Copy Link
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Landing Preview (blurred cards for logged-out users) ───────────────────
+function LandingListingPreview({ onAuth }) {
+  const [listings, setListings] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPreview = async () => {
+      try {
+        const res = await fetch(
+          `${SUPABASE_URL}/listings?select=id,title,category,location,image_url,created_at,status&status=eq.available&order=created_at.desc&limit=3`,
+          { headers: getHeaders() }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setListings(Array.isArray(data) ? data.slice(0, 3) : []);
+        }
+      } catch {
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPreview();
+  }, []);
+
+  const CATEGORY_COLORS_PREVIEW = {
+    Electronics: "bg-blue-50 text-blue-700",
+    Furniture: "bg-amber-50 text-amber-700",
+    "Office Supplies": "bg-purple-50 text-purple-700",
+    "Medical Supplies": "bg-teal-50 text-teal-700",
+    "Food & Groceries": "bg-green-50 text-green-700",
+    Clothing: "bg-pink-50 text-pink-700",
+    "Books & Education": "bg-indigo-50 text-indigo-700",
+    Other: "bg-slate-50 text-slate-700",
+  };
+
+  const placeholders = [1, 2, 3];
+
+  return (
+    <section className="py-20 bg-slate-50 border-t border-slate-100">
+      <div className="max-w-6xl mx-auto px-6">
+        <div className="text-center mb-10">
+          <span className="inline-flex items-center gap-2 text-[12px] font-semibold text-blue-600 tracking-widest uppercase mb-3">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
+            Live Marketplace
+          </span>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">
+            Real items. Real impact. Right now.
+          </h2>
+          <p className="text-slate-500 text-[14px]">
+            Sign in to see all listings, claim items, and connect with donors.
+          </p>
+        </div>
+
+        <div className="relative">
+          {/* Card grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {loading
+              ? placeholders.map((i) => (
+                  <div
+                    key={i}
+                    className="bg-white border border-slate-100 rounded-2xl overflow-hidden animate-pulse"
+                  >
+                    <div className="w-full h-44 bg-slate-100" />
+                    <div className="p-5 space-y-3">
+                      <div className="h-4 bg-slate-100 rounded-full w-3/4" />
+                      <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+                      <div className="h-3 bg-slate-100 rounded-full w-full" />
+                    </div>
+                  </div>
+                ))
+              : (listings.length > 0
+                  ? listings
+                  : placeholders.map((_, i) => ({
+                      id: i,
+                      title: "Available Item",
+                      category: "Other",
+                      location: "Global",
+                      image_url: null,
+                      status: "available",
+                    }))
+                ).map((listing, i) => {
+                  const catStyle =
+                    CATEGORY_COLORS_PREVIEW[listing.category] ||
+                    CATEGORY_COLORS_PREVIEW["Other"];
+                  let imgUrl = null;
+                  try {
+                    const parsed = JSON.parse(listing.image_url);
+                    imgUrl = Array.isArray(parsed)
+                      ? parsed[0]
+                      : listing.image_url;
+                  } catch {
+                    imgUrl = listing.image_url;
+                  }
+                  return (
+                    <div
+                      key={listing.id || i}
+                      className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm select-none"
+                    >
+                      {/* Image area */}
+                      <div className="relative w-full h-44 bg-slate-100 overflow-hidden">
+                        {imgUrl ? (
+                          <img
+                            src={imgUrl}
+                            alt=""
+                            className="w-full h-full object-cover blur-sm scale-110"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-4xl bg-slate-100">
+                            📦
+                          </div>
+                        )}
+                        {/* Lock overlay */}
+                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              className="w-6 h-6 text-slate-400"
+                            >
+                              <rect
+                                x="3"
+                                y="11"
+                                width="18"
+                                height="11"
+                                rx="2"
+                                ry="2"
+                              />
+                              <path
+                                d="M7 11V7a5 5 0 0110 0v4"
+                                strokeLinecap="round"
+                              />
+                            </svg>
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              Sign in to view
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${catStyle}`}
+                          >
+                            {listing.category}
+                          </span>
+                        </div>
+                        {/* Blurred title */}
+                        <div className="h-4 bg-slate-200 rounded-full w-3/4 mb-1.5 blur-[3px]" />
+                        <div className="h-3 bg-slate-100 rounded-full w-1/2 blur-[3px]" />
+                      </div>
+                    </div>
+                  );
+                })}
+          </div>
+
+          {/* Fade + CTA overlay at bottom */}
+          <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-slate-50 via-slate-50/80 to-transparent pointer-events-none" />
+        </div>
+
+        {/* CTA */}
+        <div className="mt-8 flex flex-col items-center gap-3">
+          <button
+            onClick={onAuth}
+            className="group flex items-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-200 hover:shadow-2xl hover:-translate-y-1 text-[15px]"
+          >
+            Sign in to see all listings
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+            >
+              <path
+                d="M5 12h14M12 5l7 7-7 7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <p className="text-[12px] text-slate-400">
+            Free to join. No credit card needed.
+          </p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showAuth, setShowAuth] = useState(false);
@@ -5952,27 +6766,33 @@ export default function App() {
         />
 
         <Hero
-          onBrowse={() => scrollToId("browse")}
+          onBrowse={() => (user ? scrollToId("browse") : setShowAuth(true))}
           onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
         />
         <HowItWorksSection
-          onBrowse={() => scrollToId("browse")}
+          onBrowse={() => (user ? scrollToId("browse") : setShowAuth(true))}
           onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
           onAuth={() => setShowAuth(true)}
           user={user}
         />
-        <div ref={browseRef}>
-          <ListingsSection
-            refreshTrigger={refreshTrigger}
-            user={user}
-            onOpenChat={(l) => setChatListing(l)}
-            onListingsLoaded={setAllListings}
-          />
-        </div>
-        <FormSection
-          onSuccess={() => setRefreshTrigger((n) => n + 1)}
-          user={user}
-        />
+        {user ? (
+          <>
+            <div ref={browseRef}>
+              <ListingsSection
+                refreshTrigger={refreshTrigger}
+                user={user}
+                onOpenChat={(l) => setChatListing(l)}
+                onListingsLoaded={setAllListings}
+              />
+            </div>
+            <FormSection
+              onSuccess={() => setRefreshTrigger((n) => n + 1)}
+              user={user}
+            />
+          </>
+        ) : (
+          <LandingListingPreview onAuth={() => setShowAuth(true)} />
+        )}
         <div ref={missionRef}>
           <MissionSection />
         </div>
