@@ -4537,7 +4537,7 @@ function ListingsSection({
     setError(null);
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/listings?select=id,title,description,category,location,quantity,condition,image_url,owner_email,owner_org_name,owner_region,owner_type,region_country,status,created_at,transfers_completed,is_verified&order=created_at.desc`,
+        `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
         { headers: getHeaders(getToken()) }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -6836,7 +6836,7 @@ function DashboardContent({
     fetch(
       `${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(
         user.email
-      )}&order=created_at.desc&select=id,title,category,status,quantity,created_at,image_url,description,location`,
+      )}&order=created_at.desc&select=*`,
       { headers: getHeaders(getToken()) }
     )
       .then((r) => r.json())
@@ -6852,7 +6852,7 @@ function DashboardContent({
     fetch(
       `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(
         user.email
-      )}&order=created_at.desc&select=id,title,category,status,quantity,created_at,image_url,verification_pin,owner_email,owner_org_name,location`,
+      )}&order=created_at.desc&select=*`,
       { headers: getHeaders(getToken()) }
     )
       .then((r) => r.json())
