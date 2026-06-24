@@ -11,18 +11,10 @@ import PrivacyModal from "./PrivacyModal";
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // ─── Supabase Config (reads from .env in production) ─────────────────────────
-const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ||
-  "https://dwpqeuuqfbmbuqpuufup.supabase.co/rest/v1";
-const SUPABASE_STORAGE =
-  import.meta.env.VITE_SUPABASE_STORAGE ||
-  "https://dwpqeuuqfbmbuqpuufup.supabase.co/storage/v1";
-const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3cHFldXVxZmJtYnVxcHV1ZnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMDY4MjIsImV4cCI6MjA5NDU4MjgyMn0.lzhbbl49fPMDc-YKzT2fxR1BL58eDOXgWo4T-HM2CBM";
-const AUTH_URL =
-  import.meta.env.VITE_AUTH_URL ||
-  "https://dwpqeuuqfbmbuqpuufup.supabase.co/auth/v1";
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_STORAGE = import.meta.env.VITE_SUPABASE_STORAGE;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const AUTH_URL = import.meta.env.VITE_AUTH_URL;
 
 const getHeaders = (token = null) => ({
   apikey: SUPABASE_ANON_KEY,
@@ -69,18 +61,27 @@ function markMessagesRead(userEmail) {
 }
 
 // ─── Edge Function URLs ───────────────────────────────────────────────────────
-const EDGE_FUNCTION_URL = import.meta.env.VITE_SUPABASE_URL
-  ? import.meta.env.VITE_SUPABASE_URL.replace(
-      "/rest/v1",
-      "/functions/v1/send-whatsapp-otp"
-    )
-  : "https://dwpqeuuqfbmbuqpuufup.supabase.co/functions/v1/send-whatsapp-otp";
+const EDGE_FUNCTION_URL = (import.meta.env.VITE_SUPABASE_URL || "").replace(
+  "/rest/v1",
+  "/functions/v1/send-whatsapp-otp"
+);
 
 // ─── Founder Access Control ───────────────────────────────────────────────────
 // UI ONLY: this controls frontend visibility of the PDF button.
 // SECURITY WARNING: true admin privileges MUST be enforced via Supabase RLS policies
 // and server-side role checks — never trust client-side email matching for data access.
 const FOUNDER_EMAIL = "younus.abdulkadir09@gmail.com";
+
+// ─── Time helper ─────────────────────────────────────────────────────────────
+function timeAgo(dateStr) {
+  if (!dateStr) return "";
+  const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
+  return `${Math.floor(diff / 2592000)}mo ago`;
+}
 
 // ─── XSS-Safe Sanitizer (HTML entity encoder) ────────────────────────────────
 // Encodes dangerous characters as safe HTML entities instead of stripping them,
@@ -3974,12 +3975,17 @@ function ListingCard({
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               {listing.category && (
                 <span
                   className={`inline-flex items-center text-[11px] font-semibold px-2 py-1 rounded-full ring-1 ${categoryStyle}`}
                 >
                   {listing.category}
+                </span>
+              )}
+              {listing.created_at && (
+                <span className="text-[10px] text-slate-400">
+                  {timeAgo(listing.created_at)}
                 </span>
               )}
             </div>
@@ -4120,12 +4126,10 @@ function ListingCard({
                     </span>
                   )}
                   {/* Show claimer info to owner */}
-                  {isClaimed && listing.claimer_id && (
+                  {isClaimed && (
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-                      <span>👤</span>
-                      <span className="font-medium truncate max-w-[140px]">
-                        {listing.claimer_id}
-                      </span>
+                      <span>✅</span>
+                      <span className="font-medium">Item Claimed</span>
                     </div>
                   )}
                 </div>
@@ -4503,6 +4507,7 @@ function ListingsSection({
   user,
   onOpenChat,
   onListingsLoaded,
+  dashMode = false,
 }) {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -4532,7 +4537,7 @@ function ListingsSection({
     setError(null);
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
+        `${SUPABASE_URL}/listings?select=id,title,description,category,location,quantity,condition,image_url,owner_email,owner_org_name,owner_region,owner_type,region_country,status,created_at,transfers_completed,is_verified&order=created_at.desc`,
         { headers: getHeaders(getToken()) }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -5289,6 +5294,12 @@ const EMPTY_FORM = {
 };
 
 function FormSection({ onSuccess, user }) {
+  // Recipients should never see the donate form
+  const isRecipient = [
+    "School/Non-Profit Recipient",
+    "Individual Recipient",
+  ].includes(user?.account_type);
+  if (isRecipient) return null;
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -6344,6 +6355,1126 @@ function ListingDetailModal({
   );
 }
 
+// ─── Change Password Modal ────────────────────────────────────────────────────
+function ChangePasswordModal({ onClose }) {
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleSave = async () => {
+    setError("");
+    setSuccess("");
+    if (!next || next.length < 8) {
+      setError("New password must be at least 8 characters.");
+      return;
+    }
+    if (next !== confirm) {
+      setError("Passwords do not match.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`${AUTH_URL}/user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ password: next }),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || "Failed to update password.");
+      }
+      setSuccess("Password updated successfully!");
+      setCurrent("");
+      setNext("");
+      setConfirm("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
+      <div
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+        >
+          <IconX />
+        </button>
+        <h3 className="text-[17px] font-bold text-slate-900 mb-5">
+          Change Password
+        </h3>
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-[13px] text-green-700">
+            {success}
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+              New Password
+            </label>
+            <input
+              type="password"
+              value={next}
+              onChange={(e) => setNext(e.target.value)}
+              placeholder="Min 8 characters"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+              Confirm New Password
+            </label>
+            <input
+              type="password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="Repeat new password"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+            />
+          </div>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]"
+          >
+            {saving ? (
+              <>
+                <IconLoader /> Saving…
+              </>
+            ) : (
+              <>
+                <IconCheck /> Update Password
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Full Facebook-Style Dashboard ───────────────────────────────────────────
+function Dashboard({
+  user,
+  dashView,
+  setDashView,
+  onSignOut,
+  unreadCount,
+  onOpenChat,
+  onOpenInbox,
+  refreshTrigger,
+  onRefresh,
+  allListings,
+  onListingsLoaded,
+}) {
+  const isRecipient = [
+    "School/Non-Profit Recipient",
+    "Individual Recipient",
+  ].includes(user?.account_type);
+  const isDonor = ["Corporate/Lab Donor", "Individual Donor"].includes(
+    user?.account_type
+  );
+  const initials = (user?.username || user?.org_name || user?.email || "U")
+    .slice(0, 2)
+    .toUpperCase();
+
+  const navItems = [
+    {
+      id: "feed",
+      label: "Home Feed",
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="w-5 h-5"
+        >
+          <path
+            d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <polyline
+            points="9 22 9 12 15 12 15 22"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    ...(isDonor
+      ? [
+          {
+            id: "mylistings",
+            label: "My Listings",
+            icon: (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-5 h-5"
+              >
+                <path
+                  d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <polyline
+                  points="14 2 14 8 20 8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ),
+          },
+        ]
+      : []),
+    ...(isRecipient
+      ? [
+          {
+            id: "claimed",
+            label: "Claimed Items",
+            icon: (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-5 h-5"
+              >
+                <path
+                  d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ),
+          },
+        ]
+      : []),
+    {
+      id: "messages",
+      label: "Messages",
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="w-5 h-5"
+        >
+          <path
+            d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      badge: unreadCount > 0 ? unreadCount : null,
+    },
+    {
+      id: "impact",
+      label: "My Impact",
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="w-5 h-5"
+        >
+          <polyline
+            points="22 12 18 12 15 21 9 3 6 12 2 12"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: "settings",
+      label: "Settings",
+      icon: (
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          className="w-5 h-5"
+        >
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex">
+      {/* ── LEFT SIDEBAR (desktop only) ── */}
+      <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 fixed top-0 left-0 h-full z-30 shadow-sm">
+        {/* Logo */}
+        <div className="px-5 py-5 border-b border-slate-100">
+          <span className="text-[20px] font-black text-blue-600 tracking-tight">
+            Equilinkz
+          </span>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Bridging the resource gap
+          </p>
+        </div>
+
+        {/* User profile card */}
+        <div className="px-4 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[14px] shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-slate-900 truncate">
+                {user?.username || user?.org_name || "User"}
+              </p>
+              <p className="text-[10px] text-slate-500 truncate">
+                {user?.account_type}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Nav links */}
+        <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setDashView(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all relative ${
+                dashView === item.id
+                  ? "bg-blue-50 text-blue-700 font-semibold"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+              {item.badge && (
+                <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          ))}
+        </nav>
+
+        {/* Post item button — donors only */}
+        {isDonor && (
+          <div className="px-4 pb-4">
+            <button
+              onClick={() => setDashView("post")}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-[13px] transition-all shadow-sm"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className="w-4 h-4"
+              >
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+              Post an Item
+            </button>
+          </div>
+        )}
+
+        {/* Sign out */}
+        <div className="px-4 pb-5 border-t border-slate-100 pt-3">
+          <button
+            onClick={onSignOut}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-4 h-4"
+            >
+              <path
+                d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <polyline
+                points="16 17 21 12 16 7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <line x1="21" y1="12" x2="9" y2="12" strokeLinecap="round" />
+            </svg>
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* ── MAIN CONTENT ── */}
+      <main className="flex-1 md:ml-64 pb-20 md:pb-0 min-h-screen">
+        <DashboardContent
+          view={dashView}
+          setView={setDashView}
+          user={user}
+          isRecipient={isRecipient}
+          isDonor={isDonor}
+          onOpenChat={onOpenChat}
+          onOpenInbox={onOpenInbox}
+          refreshTrigger={refreshTrigger}
+          onRefresh={onRefresh}
+          allListings={allListings}
+          onListingsLoaded={onListingsLoaded}
+          unreadCount={unreadCount}
+          onSignOut={onSignOut}
+        />
+      </main>
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-1 py-1 shadow-lg">
+        {navItems
+          .filter((n) =>
+            ["feed", "mylistings", "claimed", "messages", "settings"].includes(
+              n.id
+            )
+          )
+          .slice(0, 5)
+          .map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setDashView(item.id)}
+              className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
+                dashView === item.id
+                  ? "text-blue-600"
+                  : "text-slate-400 hover:text-slate-700"
+              }`}
+            >
+              {item.icon}
+              <span className="text-[9px] font-medium">
+                {item.label.split(" ")[0]}
+              </span>
+              {item.badge && (
+                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
+                  {item.badge}
+                </span>
+              )}
+            </button>
+          ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Dashboard Content Router ─────────────────────────────────────────────────
+function DashboardContent({
+  view,
+  setView,
+  user,
+  isRecipient,
+  isDonor,
+  onOpenChat,
+  onOpenInbox,
+  refreshTrigger,
+  onRefresh,
+  allListings,
+  onListingsLoaded,
+  unreadCount,
+  onSignOut,
+}) {
+  const [myListings, setMyListings] = useState([]);
+  const [claimedItems, setClaimedItems] = useState([]);
+  const [loadingMine, setLoadingMine] = useState(false);
+  const [loadingClaimed, setLoadingClaimed] = useState(false);
+  const [showChangePwd, setShowChangePwd] = useState(false);
+  const [settingsUsername, setSettingsUsername] = useState(
+    user?.username || ""
+  );
+  const [settingsOrgName, setSettingsOrgName] = useState(user?.org_name || "");
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [settingsSuccess, setSettingsSuccess] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Fetch MY listings (donor view)
+  useEffect(() => {
+    if (view !== "mylistings" || !user) return;
+    setLoadingMine(true);
+    fetch(
+      `${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(
+        user.email
+      )}&order=created_at.desc&select=id,title,category,status,quantity,created_at,image_url,description,location`,
+      { headers: getHeaders(getToken()) }
+    )
+      .then((r) => r.json())
+      .then((d) => setMyListings(Array.isArray(d) ? d : []))
+      .catch(() => setMyListings([]))
+      .finally(() => setLoadingMine(false));
+  }, [view, user, refreshTrigger]);
+
+  // Fetch CLAIMED items (recipient view) — fetch listings where this user is claimer
+  useEffect(() => {
+    if (view !== "claimed" || !user) return;
+    setLoadingClaimed(true);
+    fetch(
+      `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(
+        user.email
+      )}&order=created_at.desc&select=id,title,category,status,quantity,created_at,image_url,verification_pin,owner_email,owner_org_name,location`,
+      { headers: getHeaders(getToken()) }
+    )
+      .then((r) => r.json())
+      .then((d) => setClaimedItems(Array.isArray(d) ? d : []))
+      .catch(() => setClaimedItems([]))
+      .finally(() => setLoadingClaimed(false));
+  }, [view, user, refreshTrigger]);
+
+  const saveSettings = async () => {
+    if (!settingsUsername.trim()) {
+      setSettingsError("Username cannot be empty.");
+      return;
+    }
+    setSettingsSaving(true);
+    setSettingsError("");
+    setSettingsSuccess("");
+    try {
+      const res = await fetch(`${AUTH_URL}/user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          data: {
+            ...user,
+            username: settingsUsername.trim(),
+            org_name: settingsOrgName.trim(),
+          },
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save.");
+      const updated = {
+        ...user,
+        username: settingsUsername.trim(),
+        org_name: settingsOrgName.trim(),
+      };
+      localStorage.setItem("eq_user", JSON.stringify(updated));
+      setSettingsSuccess("Profile saved!");
+    } catch (err) {
+      setSettingsError(err.message);
+    } finally {
+      setSettingsSaving(false);
+    }
+  };
+
+  const STATUS_BADGE = {
+    available: "bg-green-100 text-green-700",
+    pending: "bg-amber-100 text-amber-700",
+    claimed: "bg-amber-100 text-amber-700",
+    transferred: "bg-slate-100 text-slate-500",
+  };
+  const STATUS_LABEL = {
+    available: "Available",
+    pending: "Claimed",
+    claimed: "Claimed",
+    transferred: "Transferred",
+  };
+
+  // ── FEED ──
+  if (view === "feed" || view === "post") {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* Page header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-[22px] font-bold text-slate-900">
+              {view === "post" ? "Post an Item" : "Browse Listings"}
+            </h1>
+            <p className="text-[13px] text-slate-500 mt-0.5">
+              {view === "post"
+                ? "List your surplus for those who need it"
+                : "Available items from donors worldwide"}
+            </p>
+          </div>
+          {isDonor && view === "feed" && (
+            <button
+              onClick={() => setView("post")}
+              className="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-xl text-[13px] transition-all shadow-sm"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className="w-4 h-4"
+              >
+                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+              </svg>
+              Post Item
+            </button>
+          )}
+        </div>
+        {view === "post" && isDonor ? (
+          <FormSectionInline
+            onSuccess={() => {
+              onRefresh();
+              setView("mylistings");
+            }}
+            user={user}
+          />
+        ) : (
+          <ListingsSection
+            refreshTrigger={refreshTrigger}
+            user={user}
+            onOpenChat={onOpenChat}
+            onListingsLoaded={onListingsLoaded}
+            dashMode={true}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ── MY LISTINGS (donors) ──
+  if (view === "mylistings") {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-[22px] font-bold text-slate-900">
+              My Listings
+            </h1>
+            <p className="text-[13px] text-slate-500 mt-0.5">
+              Items you have posted
+            </p>
+          </div>
+          <button
+            onClick={() => setView("post")}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-xl text-[13px] transition-all shadow-sm"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="w-4 h-4"
+            >
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+            Post New
+          </button>
+        </div>
+        {loadingMine ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl h-32 animate-pulse border border-slate-100"
+              />
+            ))}
+          </div>
+        ) : myListings.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-5xl mb-4">📦</div>
+            <h3 className="text-[16px] font-bold text-slate-700 mb-2">
+              No listings yet
+            </h3>
+            <p className="text-[13px] text-slate-500 mb-6">
+              Post your first surplus item and make an impact.
+            </p>
+            <button
+              onClick={() => setView("post")}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all"
+            >
+              Post an Item
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {myListings.map((l) => {
+              let img = null;
+              try {
+                const p = JSON.parse(l.image_url);
+                img = Array.isArray(p) ? p[0] : l.image_url;
+              } catch {
+                img = l.image_url;
+              }
+              return (
+                <div
+                  key={l.id}
+                  className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all"
+                >
+                  <div className="w-14 h-14 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                    {img ? (
+                      <img
+                        src={img}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl">
+                        📦
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[14px] font-semibold text-slate-900 truncate">
+                      {l.title}
+                    </p>
+                    <p className="text-[12px] text-slate-500 mt-0.5">
+                      {l.category} · {timeAgo(l.created_at)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <span
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        STATUS_BADGE[l.status] || "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {STATUS_LABEL[l.status] || l.status}
+                    </span>
+                    {l.quantity && (
+                      <span className="text-[11px] text-slate-400">
+                        Qty: {l.quantity}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── CLAIMED ITEMS (recipients) ──
+  if (view === "claimed") {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-[22px] font-bold text-slate-900">
+            Claimed Items
+          </h1>
+          <p className="text-[13px] text-slate-500 mt-0.5">
+            Items you have claimed — show your PIN at pickup
+          </p>
+        </div>
+        {loadingClaimed ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-2xl h-24 animate-pulse border border-slate-100"
+              />
+            ))}
+          </div>
+        ) : claimedItems.length === 0 ? (
+          <div className="text-center py-20">
+            <div className="text-5xl mb-4">🎁</div>
+            <h3 className="text-[16px] font-bold text-slate-700 mb-2">
+              No claimed items yet
+            </h3>
+            <p className="text-[13px] text-slate-500 mb-6">
+              Browse listings and claim what you need.
+            </p>
+            <button
+              onClick={() => setView("feed")}
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all"
+            >
+              Browse Listings
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {claimedItems.map((l) => {
+              let img = null;
+              try {
+                const p = JSON.parse(l.image_url);
+                img = Array.isArray(p) ? p[0] : l.image_url;
+              } catch {
+                img = l.image_url;
+              }
+              return (
+                <div
+                  key={l.id}
+                  className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm"
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0">
+                      {img ? (
+                        <img
+                          src={img}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-2xl">
+                          📦
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-[15px] font-bold text-slate-900">
+                          {l.title}
+                        </p>
+                        <span
+                          className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                            STATUS_BADGE[l.status] ||
+                            "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {STATUS_LABEL[l.status] || l.status}
+                        </span>
+                      </div>
+                      <p className="text-[12px] text-slate-500 mt-0.5">
+                        {l.category} · {l.location} · {timeAgo(l.created_at)}
+                      </p>
+                      {l.owner_org_name && (
+                        <p className="text-[12px] text-slate-500 mt-0.5">
+                          From: {l.owner_org_name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {/* PIN display — only for this user's claimed item */}
+                  {l.verification_pin && (
+                    <div className="mt-4 bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                      <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">
+                        Your Pickup PIN
+                      </p>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[32px] font-black text-blue-700 tracking-widest">
+                          {l.verification_pin}
+                        </span>
+                        <button
+                          onClick={() =>
+                            navigator.clipboard.writeText(
+                              String(l.verification_pin)
+                            )
+                          }
+                          className="flex items-center gap-1.5 text-[12px] font-medium text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-3 py-1.5 rounded-lg transition-all"
+                        >
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            className="w-3.5 h-3.5"
+                          >
+                            <rect
+                              x="9"
+                              y="9"
+                              width="13"
+                              height="13"
+                              rx="2"
+                              ry="2"
+                            />
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                          </svg>
+                          Copy
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-blue-500 mt-2">
+                        Show this PIN to the donor at pickup to complete the
+                        transfer.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── MESSAGES ──
+  if (view === "messages") {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <h1 className="text-[22px] font-bold text-slate-900 mb-6">Messages</h1>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <InboxModal
+            user={user}
+            onClose={() => setView("feed")}
+            onOpenChat={onOpenChat}
+            allListings={allListings}
+            inline={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // ── IMPACT ──
+  if (view === "impact") {
+    const myDonated = allListings.filter(
+      (l) => l.owner_email === user?.email
+    ).length;
+    const myTransferred = allListings.filter(
+      (l) => l.owner_email === user?.email && l.status === "transferred"
+    ).length;
+    const myClaimed = claimedItems.length;
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <h1 className="text-[22px] font-bold text-slate-900 mb-2">My Impact</h1>
+        <p className="text-[13px] text-slate-500 mb-8">
+          Your contribution to bridging the resource gap.
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+          {isDonor && (
+            <>
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+                <p className="text-[36px] font-black text-blue-600">
+                  {myDonated}
+                </p>
+                <p className="text-[12px] font-semibold text-slate-600 mt-1">
+                  Items Posted
+                </p>
+              </div>
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+                <p className="text-[36px] font-black text-green-600">
+                  {myTransferred}
+                </p>
+                <p className="text-[12px] font-semibold text-slate-600 mt-1">
+                  Transferred
+                </p>
+              </div>
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+                <p className="text-[36px] font-black text-amber-500">
+                  {myDonated - myTransferred > 0
+                    ? myDonated - myTransferred
+                    : 0}
+                </p>
+                <p className="text-[12px] font-semibold text-slate-600 mt-1">
+                  Still Available
+                </p>
+              </div>
+            </>
+          )}
+          {isRecipient && (
+            <>
+              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+                <p className="text-[36px] font-black text-blue-600">
+                  {myClaimed}
+                </p>
+                <p className="text-[12px] font-semibold text-slate-600 mt-1">
+                  Items Claimed
+                </p>
+              </div>
+            </>
+          )}
+        </div>
+        {isDonor && myTransferred >= 3 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4">
+            <span className="text-3xl">🏆</span>
+            <div>
+              <p className="text-[14px] font-bold text-blue-800">
+                Trusted Donor Badge
+              </p>
+              <p className="text-[12px] text-blue-600">
+                You have completed {myTransferred} verified transfers. Thank
+                you!
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── SETTINGS ──
+  if (view === "settings") {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-6">
+        <h1 className="text-[22px] font-bold text-slate-900 mb-6">Settings</h1>
+        {showChangePwd && (
+          <ChangePasswordModal onClose={() => setShowChangePwd(false)} />
+        )}
+
+        {/* Profile */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-4">
+          <h2 className="text-[15px] font-bold text-slate-800 mb-4">Profile</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                Display Name
+              </label>
+              <input
+                value={settingsUsername}
+                onChange={(e) => setSettingsUsername(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              />
+            </div>
+            {["Corporate/Lab Donor", "School/Non-Profit Recipient"].includes(
+              user?.account_type
+            ) && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
+                  Organisation Name
+                </label>
+                <input
+                  value={settingsOrgName}
+                  onChange={(e) => setSettingsOrgName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                />
+              </div>
+            )}
+            <div className="bg-slate-50 rounded-xl p-4 space-y-1.5 text-[12px]">
+              <p>
+                <span className="font-semibold text-slate-700">Email:</span>{" "}
+                <span className="text-slate-500">{user?.email}</span>
+              </p>
+              <p>
+                <span className="font-semibold text-slate-700">
+                  Account type:
+                </span>{" "}
+                <span className="text-slate-500">{user?.account_type}</span>
+              </p>
+              <p>
+                <span className="font-semibold text-slate-700">Region:</span>{" "}
+                <span className="text-slate-500">
+                  {user?.region || "Not set"}
+                </span>
+              </p>
+            </div>
+            {settingsError && (
+              <p className="text-[12px] text-red-500">{settingsError}</p>
+            )}
+            {settingsSuccess && (
+              <p className="text-[12px] text-green-600">{settingsSuccess}</p>
+            )}
+            <button
+              onClick={saveSettings}
+              disabled={settingsSaving}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]"
+            >
+              {settingsSaving ? (
+                <>
+                  <IconLoader /> Saving…
+                </>
+              ) : (
+                <>
+                  <IconCheck /> Save Changes
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Security */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-4">
+          <h2 className="text-[15px] font-bold text-slate-800 mb-4">
+            Security
+          </h2>
+          <button
+            onClick={() => setShowChangePwd(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl text-[13px] font-medium text-slate-700 hover:text-blue-700 transition-all"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-4 h-4"
+            >
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round" />
+            </svg>
+            Change Password
+          </button>
+        </div>
+
+        {/* Danger zone */}
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
+          <h2 className="text-[15px] font-bold text-red-800 mb-2">
+            Danger Zone
+          </h2>
+          <p className="text-[12px] text-red-600 mb-4 leading-relaxed">
+            Permanently delete your account and all your listings. This cannot
+            be undone.
+          </p>
+          {!confirmDelete ? (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="w-full py-2.5 text-[13px] font-semibold text-red-600 border border-red-300 hover:bg-red-100 rounded-xl transition-all"
+            >
+              Delete My Account
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-[12px] text-red-700 font-semibold text-center">
+                Are you absolutely sure?
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="flex-1 py-2.5 text-[13px] font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onSignOut}
+                  className="flex-1 py-2.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all"
+                >
+                  Yes, Delete
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+// ─── FormSection inline (used inside dashboard post view) ────────────────────
+function FormSectionInline({ onSuccess, user }) {
+  return (
+    <div className="max-w-2xl mx-auto">
+      <FormSection onSuccess={onSuccess} user={user} />
+    </div>
+  );
+}
+
 // ─── Landing Preview (blurred cards for logged-out users) ───────────────────
 function LandingListingPreview({ onAuth }) {
   const [listings, setListings] = useState([]);
@@ -6544,6 +7675,8 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [allListings, setAllListings] = useState([]);
+  const [dashView, setDashView] = useState("feed"); // feed | mylistings | claimed | impact | settings
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [user, setUser] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem("eq_user"));
@@ -6588,23 +7721,19 @@ export default function App() {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
   const handleAuthSuccess = (u) => {
-    // Clear any previous user's cached data to ensure clean session
-    const prevUser = localStorage.getItem("eq_user");
-    if (prevUser) {
-      try {
-        const prev = JSON.parse(prevUser);
-        if (prev.email && prev.email !== u.email) {
-          // Different user logging in — clear their data
-          localStorage.removeItem("eq_msgs_seen_" + prev.email);
-          localStorage.removeItem("eq_transferred_count");
-          Object.keys(sessionStorage).forEach((k) => {
-            if (k.startsWith("eq_pin_")) sessionStorage.removeItem(k);
-          });
-        }
-      } catch {}
-    }
-    // Start fresh message tracking from now
+    // SECURITY: Clear ALL previous user data before setting new user
+    // This guarantees no data from a previous session leaks to a new user
+    try {
+      // Clear all eq_ prefixed localStorage keys
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith("eq_")) localStorage.removeItem(k);
+      });
+      // Clear all sessionStorage
+      sessionStorage.clear();
+    } catch {}
+    // Set new user session
     localStorage.setItem("eq_msgs_seen_" + u.email, new Date().toISOString());
+    setDashView("feed");
     setUser(u);
     setShowAuth(false);
   };
@@ -6615,99 +7744,24 @@ export default function App() {
     window.addEventListener("equilinkz:openPrivacy", handler);
     return () => window.removeEventListener("equilinkz:openPrivacy", handler);
   }, []);
-  const handleSignOut = () => {
-    const email = user?.email;
-    localStorage.removeItem("eq_token");
-    localStorage.removeItem("eq_user");
-    if (email) {
-      localStorage.removeItem("eq_msgs_seen_" + email);
-      localStorage.removeItem("eq_transferred_count");
-    }
+  const handleSignOut = () => setShowSignOutConfirm(true);
+  const confirmSignOut = () => {
+    try {
+      Object.keys(localStorage).forEach((k) => {
+        if (k.startsWith("eq_")) localStorage.removeItem(k);
+      });
+      sessionStorage.clear();
+    } catch {}
     setUser(null);
     setUnreadCount(0);
+    setDashView("feed");
+    setShowSignOutConfirm(false);
   };
 
   return (
     <ToastProvider>
-      <div className="font-sans antialiased text-slate-900 bg-white pb-16 md:pb-0">
+      <div className="font-sans antialiased text-slate-900 bg-white">
         <CookieBanner onPrivacy={() => setShowPrivacy(true)} />
-        <BackToTopButton />
-        {/* Mobile bottom nav */}
-        {user && (
-          <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-2 py-2 shadow-lg">
-            <button
-              onClick={() => scrollToId("browse")}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-5 h-5"
-              >
-                <circle cx="11" cy="11" r="8" />
-                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-              </svg>
-              <span className="text-[10px] font-medium">Browse</span>
-            </button>
-            <button
-              onClick={() => scrollToId("list")}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-5 h-5"
-              >
-                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-              </svg>
-              <span className="text-[10px] font-medium">List</span>
-            </button>
-            <button
-              onClick={() => setShowInbox(true)}
-              className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-5 h-5"
-              >
-                <path
-                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              {unreadCount > 0 && (
-                <span className="absolute top-1 right-2 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                  {unreadCount}
-                </span>
-              )}
-              <span className="text-[10px] font-medium">Messages</span>
-            </button>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="flex flex-col items-center gap-0.5 px-3 py-1.5 text-slate-500 hover:text-blue-600 transition-colors"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-5 h-5"
-              >
-                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              <span className="text-[10px] font-medium">Profile</span>
-            </button>
-          </div>
-        )}
         {showAuth && (
           <AuthModal
             onClose={() => setShowAuth(false)}
@@ -6737,72 +7791,95 @@ export default function App() {
             listings={allListings}
           />
         )}
-        {showSettings && (
-          <SettingsModal
-            user={user}
-            onClose={() => setShowSettings(false)}
-            onUpdated={(u) => setUser(u)}
-            onDeleted={() => {
-              setUser(null);
-              setShowSettings(false);
-            }}
-          />
+        {/* Sign Out Confirmation */}
+        {showSignOutConfirm && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div
+              className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+              onClick={() => setShowSignOutConfirm(false)}
+            />
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
+              <div className="text-4xl mb-3">👋</div>
+              <h3 className="text-[17px] font-bold text-slate-900 mb-2">
+                Sign out?
+              </h3>
+              <p className="text-[13px] text-slate-500 mb-6">
+                Are you sure you want to sign out of Equilinkz?
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowSignOutConfirm(false)}
+                  className="flex-1 py-3 text-[14px] font-semibold text-slate-700 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmSignOut}
+                  className="flex-1 py-3 text-[14px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
-        <Navbar
-          onMission={() => scrollToId("mission")}
-          onBrowse={() => scrollToId("browse")}
-          onPartners={() => scrollToId("partners")}
-          onImpact={() => scrollToId("impact")}
-          onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
-          user={user}
-          onAuth={() => setShowAuth(true)}
-          onSignOut={handleSignOut}
-          onInbox={() => setShowInbox(true)}
-          onSettings={() => setShowSettings(true)}
-          onOpenChat={(l) => setChatListing(l)}
-          allListings={allListings}
-          unreadCount={unreadCount}
-        />
-
-        <Hero
-          onBrowse={() => (user ? scrollToId("browse") : setShowAuth(true))}
-          onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
-        />
-        <HowItWorksSection
-          onBrowse={() => (user ? scrollToId("browse") : setShowAuth(true))}
-          onDonate={() => (user ? scrollToId("list") : setShowAuth(true))}
-          onAuth={() => setShowAuth(true)}
-          user={user}
-        />
         {user ? (
+          /* ── LOGGED IN: Facebook-style dashboard ── */
+          <Dashboard
+            user={user}
+            dashView={dashView}
+            setDashView={setDashView}
+            onSignOut={handleSignOut}
+            unreadCount={unreadCount}
+            onOpenChat={(l) => setChatListing(l)}
+            onOpenInbox={() => setShowInbox(true)}
+            refreshTrigger={refreshTrigger}
+            onRefresh={() => setRefreshTrigger((n) => n + 1)}
+            allListings={allListings}
+            onListingsLoaded={setAllListings}
+          />
+        ) : (
+          /* ── LOGGED OUT: Landing page ── */
           <>
-            <div ref={browseRef}>
-              <ListingsSection
-                refreshTrigger={refreshTrigger}
-                user={user}
-                onOpenChat={(l) => setChatListing(l)}
-                onListingsLoaded={setAllListings}
-              />
-            </div>
-            <FormSection
-              onSuccess={() => setRefreshTrigger((n) => n + 1)}
+            <Navbar
+              onMission={() => scrollToId("mission")}
+              onBrowse={() => setShowAuth(true)}
+              onPartners={() => scrollToId("partners")}
+              onImpact={() => scrollToId("impact")}
+              onDonate={() => setShowAuth(true)}
+              user={user}
+              onAuth={() => setShowAuth(true)}
+              onSignOut={handleSignOut}
+              onInbox={() => setShowInbox(true)}
+              onSettings={() => setShowSettings(true)}
+              onOpenChat={(l) => setChatListing(l)}
+              allListings={allListings}
+              unreadCount={unreadCount}
+            />
+            <Hero
+              onBrowse={() => setShowAuth(true)}
+              onDonate={() => setShowAuth(true)}
+            />
+            <HowItWorksSection
+              onBrowse={() => setShowAuth(true)}
+              onDonate={() => setShowAuth(true)}
+              onAuth={() => setShowAuth(true)}
               user={user}
             />
+            <LandingListingPreview onAuth={() => setShowAuth(true)} />
+            <div ref={missionRef}>
+              <MissionSection />
+            </div>
+            <div ref={partnersRef}>
+              <PartnersSection />
+            </div>
+            <div ref={impactRef}>
+              <ImpactSection />
+            </div>
+            <Footer onPrivacy={() => setShowPrivacy(true)} />
           </>
-        ) : (
-          <LandingListingPreview onAuth={() => setShowAuth(true)} />
         )}
-        <div ref={missionRef}>
-          <MissionSection />
-        </div>
-        <div ref={partnersRef}>
-          <PartnersSection />
-        </div>
-        <div ref={impactRef}>
-          <ImpactSection />
-        </div>
-        <Footer onPrivacy={() => setShowPrivacy(true)} />
       </div>
     </ToastProvider>
   );
