@@ -888,16 +888,25 @@ function ChatWindow({ listing, user, onClose }) {
     const senderEmail = user.email || "";
     const senderId = user.id || senderEmail;
     const isOwner = listing.owner_email === user.email;
-    // Determine receiver: if owner, send to claimer; if claimer, send to owner
-    // For owner: use claimer_id (email of claimer)
-    // For non-owner: use owner_email
-    // Both sides can always message each other
-    // Both owner and claimer can always message each other
-    // Owner messages go to claimer, claimer messages go to owner
-    // Even if no claimer yet, owner can send messages to the listing thread
-    const receiverId = isOwner
-      ? listing.claimer_id || listing.owner_email || ""
-      : listing.owner_email || "";
+    // FIXED: receiver_id logic
+    // Non-owner always messages the owner
+    // Owner replies to whoever last messaged them (found in messages state)
+    // Falls back to a general thread ID so message is never lost
+    let receiverId = "";
+    if (!isOwner) {
+      // Recipient/claimer sends to owner
+      receiverId = listing.owner_email || "";
+    } else {
+      // Owner replies to the most recent non-owner sender
+      const otherMsg = [...messages]
+        .reverse()
+        .find((m) => m.sender_email && m.sender_email !== user.email);
+      receiverId =
+        otherMsg?.sender_email ||
+        otherMsg?.sender_id ||
+        listing.claimer_id ||
+        senderId;
+    }
     const tempId = "temp-" + Date.now();
 
     // STEP 1 — Add to local state INSTANTLY, before any network call
@@ -916,16 +925,18 @@ function ChatWindow({ listing, user, onClose }) {
     // STEP 2 — Save to DB silently in background, never alert user
     try {
       // Send all possible column names so whichever exists in schema is used
+      const msgHeaders = getHeaders(getToken());
+      msgHeaders["Prefer"] = "return=representation";
       const res = await fetch(SUPABASE_URL + "/messages", {
         method: "POST",
-        headers: getHeaders(getToken()),
+        headers: msgHeaders,
         body: JSON.stringify({
           listing_id: String(listing.id),
-          sender_id: senderId,
-          sender_email: senderEmail,
-          sender_name: senderName,
-          receiver_id: receiverId,
-          message_text: text,
+          sender_id: String(senderId),
+          sender_email: String(senderEmail),
+          sender_name: String(senderName),
+          receiver_id: String(receiverId),
+          message_text: String(text),
         }),
       });
       if (!res.ok) {
@@ -2827,47 +2838,239 @@ function SettingsModal({ user, onClose, onUpdated, onDeleted }) {
 }
 
 // ─── Inbox Modal ─────────────────────────────────────────────────────────────
-function InboxModal({ user, onClose, onOpenChat, listings }) {
+function InboxModal({ user, onClose, onOpenChat, allListings, inline }) {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeListing, setActiveListing] = useState(null);
 
   useEffect(() => {
     if (user) markMessagesRead(user.email);
-    const fetchThreads = async () => {
-      if (!user) return;
-      try {
-        const res = await fetch(
-          `${SUPABASE_URL}/messages?or=(sender_email.eq.${encodeURIComponent(
-            user.email
-          )},receiver_id.eq.${encodeURIComponent(
-            user.email
-          )})&order=created_at.desc&select=*&limit=200`,
-          { headers: getHeaders(getToken()) }
-        );
-        if (!res.ok) return;
-        const msgs = await res.json();
-        // Group by listing_id — one thread per listing
-        const grouped = {};
-        msgs.forEach((m) => {
-          if (!grouped[m.listing_id]) grouped[m.listing_id] = [];
-          grouped[m.listing_id].push(m);
-        });
-        setThreads(
-          Object.entries(grouped).map(([lid, messages]) => ({
-            listing_id: lid,
-            last: messages[0],
-            unread: messages.filter((m) => m.sender_email !== user.email)
-              .length,
-            listing: listings.find((l) => String(l.id) === String(lid)),
-          }))
-        );
-      } catch (_) {
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchThreads();
   }, [user]);
+
+  const fetchThreads = async () => {
+    if (!user) return;
+    setLoading(true);
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/messages?or=(sender_email.eq.${encodeURIComponent(
+          user.email
+        )},receiver_id.eq.${encodeURIComponent(
+          user.email
+        )})&order=created_at.desc&select=*&limit=300`,
+        { headers: getHeaders(getToken()) }
+      );
+      if (!res.ok) return;
+      const msgs = await res.json();
+      if (!Array.isArray(msgs)) return;
+      const grouped = {};
+      msgs.forEach((m) => {
+        const lid = String(m.listing_id);
+        if (!grouped[lid]) grouped[lid] = [];
+        grouped[lid].push(m);
+      });
+      const threadList = Object.entries(grouped).map(([lid, messages]) => {
+        const last = messages[0];
+        const otherEmail =
+          last?.sender_email === user.email
+            ? last?.receiver_id
+            : last?.sender_email;
+        const otherName =
+          messages.find((m) => m.sender_email !== user.email)?.sender_name ||
+          otherEmail ||
+          "User";
+        const unread = messages.filter(
+          (m) =>
+            m.sender_email !== user.email && !m.read_by?.includes(user.email)
+        ).length;
+        const listing = (allListings || []).find((l) => String(l.id) === lid);
+        return {
+          listing_id: lid,
+          last,
+          unread,
+          listing,
+          otherName,
+          otherEmail,
+        };
+      });
+      setThreads(threadList);
+    } catch (_) {
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const initials = (name) => (name || "U").slice(0, 2).toUpperCase();
+  const avatarColor = (name) => {
+    const colors = [
+      "bg-blue-500",
+      "bg-purple-500",
+      "bg-green-500",
+      "bg-amber-500",
+      "bg-rose-500",
+      "bg-teal-500",
+    ];
+    return colors[(name || "U").charCodeAt(0) % colors.length];
+  };
+
+  // ── If a listing is selected, show inline full chat ──
+  if (activeListing) {
+    return (
+      <div className="flex flex-col h-full">
+        {/* Chat header */}
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 bg-white shrink-0">
+          <button
+            onClick={() => setActiveListing(null)}
+            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-all"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="w-4 h-4"
+            >
+              <path
+                d="M19 12H5M12 5l-7 7 7 7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <div
+            className={`w-9 h-9 rounded-full ${avatarColor(
+              activeListing._otherName
+            )} flex items-center justify-center text-white font-bold text-[13px] shrink-0`}
+          >
+            {initials(activeListing._otherName)}
+          </div>
+          <div className="min-w-0">
+            <p className="text-[14px] font-bold text-slate-900 truncate">
+              {activeListing._otherName}
+            </p>
+            <p className="text-[11px] text-slate-400 truncate">
+              {activeListing.title}
+            </p>
+          </div>
+        </div>
+        {/* Inline chat body */}
+        <InlineChatBody listing={activeListing} user={user} />
+      </div>
+    );
+  }
+
+  // ── Thread list ──
+  const content = (
+    <div className="flex flex-col h-full">
+      <div className="px-5 py-4 border-b border-slate-100 shrink-0 flex items-center justify-between">
+        <h2 className="text-[18px] font-bold text-slate-900">Messages</h2>
+        {!inline && (
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
+          >
+            <IconX />
+          </button>
+        )}
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex flex-col gap-3 p-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3 animate-pulse">
+                <div className="w-12 h-12 bg-slate-100 rounded-full shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 bg-slate-100 rounded-full w-1/2" />
+                  <div className="h-3 bg-slate-100 rounded-full w-3/4" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : threads.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full py-20 text-center px-6">
+            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="w-8 h-8 text-slate-400"
+              >
+                <path
+                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p className="text-[15px] font-semibold text-slate-700 mb-1">
+              No messages yet
+            </p>
+            <p className="text-[13px] text-slate-400">
+              Open a listing and tap Message to start a conversation
+            </p>
+          </div>
+        ) : (
+          <div>
+            {threads.map(({ listing_id, last, unread, listing, otherName }) => (
+              <button
+                key={listing_id}
+                onClick={() => {
+                  if (listing) {
+                    const l = { ...listing, _otherName: otherName };
+                    setActiveListing(l);
+                  }
+                }}
+                className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-50 text-left"
+              >
+                <div
+                  className={`w-12 h-12 rounded-full ${avatarColor(
+                    otherName
+                  )} flex items-center justify-center text-white font-bold text-[15px] shrink-0`}
+                >
+                  {initials(otherName)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <p
+                      className={`text-[14px] truncate ${
+                        unread > 0
+                          ? "font-bold text-slate-900"
+                          : "font-semibold text-slate-700"
+                      }`}
+                    >
+                      {otherName}
+                    </p>
+                    <p className="text-[11px] text-slate-400 shrink-0">
+                      {timeAgo(last?.created_at)}
+                    </p>
+                  </div>
+                  <p
+                    className={`text-[13px] truncate ${
+                      unread > 0
+                        ? "font-semibold text-slate-800"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    {last?.sender_email === user.email ? "You: " : ""}
+                    {last?.message_text || ""}
+                  </p>
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                    {listing?.title || "Listing"}
+                  </p>
+                </div>
+                {unread > 0 && (
+                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (inline) return content;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -2875,80 +3078,219 @@ function InboxModal({ user, onClose, onOpenChat, listings }) {
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl max-h-[80vh] flex flex-col overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0">
-          <h2 className="text-[17px] font-bold text-slate-900">Messages</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition-all"
-          >
-            <IconX />
-          </button>
-        </div>
-        <div className="overflow-y-auto flex-1">
-          {loading ? (
-            <div className="flex justify-center py-12">
-              <IconLoader />
-            </div>
-          ) : threads.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-4xl mb-3">💬</div>
-              <p className="text-[14px] text-slate-500 font-medium">
-                No messages yet
-              </p>
-              <p className="text-[12px] text-slate-400 mt-1">
-                Click Message on a listing to start a conversation
-              </p>
-            </div>
-          ) : (
-            threads.map(({ listing_id, last, unread, listing }) => (
-              <button
-                key={listing_id}
-                onClick={() => {
-                  if (listing) {
-                    onOpenChat(listing);
-                    onClose();
-                  }
-                }}
-                className="w-full flex items-start gap-3 px-6 py-4 hover:bg-slate-50 transition-colors border-b border-slate-50 text-left"
+      <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl h-[80vh] flex flex-col overflow-hidden">
+        {content}
+      </div>
+    </div>
+  );
+}
+
+// ─── Inline Chat Body (used inside InboxModal when a thread is open) ──────────
+function InlineChatBody({ listing, user }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef(null);
+  const isMounted = useRef(true);
+  const pollRef = useRef(null);
+
+  useEffect(() => {
+    isMounted.current = true;
+    fetchMsgs();
+    pollRef.current = setInterval(fetchMsgs, 3000);
+    return () => {
+      isMounted.current = false;
+      clearInterval(pollRef.current);
+    };
+  }, [listing?.id]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages.length]);
+
+  const fetchMsgs = async () => {
+    if (!listing?.id || !isMounted.current) return;
+    try {
+      const res = await fetch(
+        `${SUPABASE_URL}/messages?listing_id=eq.${encodeURIComponent(
+          String(listing.id)
+        )}&order=created_at.asc&select=*&limit=200`,
+        { headers: getHeaders(getToken()) }
+      );
+      if (!res.ok || !isMounted.current) return;
+      const data = await res.json();
+      if (Array.isArray(data) && isMounted.current) setMessages(data);
+    } catch (_) {
+    } finally {
+      if (isMounted.current) setLoading(false);
+    }
+  };
+
+  const send = async () => {
+    if (!user || !input.trim()) return;
+    const text = input.trim();
+    setInput("");
+    setSending(true);
+    const senderName = user.username || user.org_name || user.email || "User";
+    const senderEmail = user.email || "";
+    const senderId = user.id || senderEmail;
+    const isOwner = listing.owner_email === user.email;
+    let receiverId = "";
+    if (!isOwner) {
+      receiverId = listing.owner_email || "";
+    } else {
+      const otherMsg = [...messages]
+        .reverse()
+        .find((m) => m.sender_email && m.sender_email !== user.email);
+      receiverId = otherMsg?.sender_email || otherMsg?.sender_id || senderId;
+    }
+    // Optimistic update
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: "temp-" + Date.now(),
+        listing_id: String(listing.id),
+        sender_id: senderId,
+        sender_email: senderEmail,
+        sender_name: senderName,
+        receiver_id: receiverId,
+        message_text: text,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    try {
+      const h = getHeaders(getToken());
+      h["Prefer"] = "return=representation";
+      const res = await fetch(SUPABASE_URL + "/messages", {
+        method: "POST",
+        headers: h,
+        body: JSON.stringify({
+          listing_id: String(listing.id),
+          sender_id: String(senderId),
+          sender_email: String(senderEmail),
+          sender_name: String(senderName),
+          receiver_id: String(receiverId),
+          message_text: String(text),
+        }),
+      });
+      if (res.ok) fetchMsgs();
+      else {
+        const e = await res.json().catch(() => ({}));
+        console.error("MSG ERROR:", res.status, e);
+      }
+    } catch (err) {
+      console.error("MSG SEND:", err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleKey = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send();
+    }
+  };
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 bg-slate-50">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <IconLoader />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full py-16 text-center">
+            <div className="w-14 h-14 bg-white border border-slate-100 rounded-full flex items-center justify-center mb-3 shadow-sm">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                className="w-7 h-7 text-slate-300"
               >
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
-                  <IconMsg />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[13px] font-semibold text-slate-900 truncate">
-                      {listing?.title || "Listing"}
-                    </p>
-                    {unread > 0 && (
-                      <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center shrink-0">
-                        {unread > 9 ? "9+" : unread}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[12px] text-slate-500 truncate mt-0.5">
-                    {last?.sender_name || "..."}:{" "}
-                    {last?.message_text || last?.body || last?.text || ""}
+                <path
+                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <p className="text-[14px] font-semibold text-slate-600">
+              Start the conversation
+            </p>
+            <p className="text-[12px] text-slate-400 mt-1">
+              Say hello to get things started
+            </p>
+          </div>
+        ) : (
+          messages.map((msg) => {
+            const isMe =
+              msg.sender_email === user?.email ||
+              msg.sender_id === user?.id ||
+              msg.sender_id === user?.email;
+            const isTemp = String(msg.id).startsWith("temp-");
+            return (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${
+                  isMe ? "items-end" : "items-start"
+                }`}
+              >
+                {!isMe && (
+                  <p className="text-[10px] font-semibold text-slate-500 mb-1 px-1">
+                    {msg.sender_name || "User"}
                   </p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
-                    {last?.created_at
-                      ? (() => {
-                          const d = Math.floor(
-                            (Date.now() - new Date(last.created_at)) / 60000
-                          );
-                          return d < 60
-                            ? `${d}m ago`
-                            : d < 1440
-                            ? `${Math.floor(d / 60)}h ago`
-                            : `${Math.floor(d / 1440)}d ago`;
-                        })()
-                      : ""}
+                )}
+                <div
+                  className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${
+                    isMe
+                      ? "bg-blue-600 text-white rounded-br-sm"
+                      : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm shadow-sm"
+                  } ${isTemp ? "opacity-60" : ""}`}
+                >
+                  <p className="break-words whitespace-pre-wrap">
+                    {msg.message_text || msg.body || msg.text || ""}
+                  </p>
+                  <p
+                    className={`text-[10px] mt-1 ${
+                      isMe ? "text-blue-200 text-right" : "text-slate-400"
+                    }`}
+                  >
+                    {isTemp
+                      ? "sending…"
+                      : new Date(msg.created_at).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                   </p>
                 </div>
-              </button>
-            ))
-          )}
-        </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+      {/* Input bar */}
+      <div className="px-4 py-3 bg-white border-t border-slate-100 flex items-end gap-2 shrink-0">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKey}
+          rows={1}
+          placeholder="Message…"
+          className="flex-1 text-[14px] bg-slate-50 border border-slate-200 rounded-2xl px-4 py-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 max-h-32"
+          style={{ overflowY: "auto" }}
+        />
+        <button
+          onClick={send}
+          disabled={!input.trim() || sending}
+          className="w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 text-white rounded-2xl transition-all shrink-0"
+        >
+          {sending ? <IconLoader /> : <IconSend />}
+        </button>
       </div>
     </div>
   );
@@ -3321,12 +3663,11 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
               How It Works
             </span>
           </div>
-          <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">
-            Simple. Secure. Free.
+          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-3">
+            Three steps. Real impact.
           </h2>
-          <p className="text-slate-500 max-w-xl mx-auto text-[15px] leading-relaxed">
-            Equilinkz connects donors and recipients in three steps — with a
-            verified handshake at every transfer to ensure accountability.
+          <p className="text-slate-500 max-w-md mx-auto text-[15px] leading-relaxed">
+            From surplus to purpose — fast, free, and fully verified.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -3440,38 +3781,29 @@ function Hero({ onBrowse, onDonate }) {
         <div className="inline-flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-full px-4 py-1.5 mb-8">
           <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
           <span className="text-[12px] font-medium text-blue-600 tracking-wider uppercase">
-            Global Resource Equity Platform
+            Live Global Marketplace
           </span>
         </div>
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight text-slate-900 leading-[1.05] mb-6">
-          Bridging the
+          Surplus finds its{" "}
           <span className="relative">
-            <span className="relative z-10 text-blue-600">Global</span>
+            <span className="relative z-10 text-blue-600">purpose.</span>
             <span
               className="absolute inset-x-0 bottom-1 h-3 bg-blue-100 -z-0 rounded"
               style={{ transform: "skewX(-2deg)" }}
             />
           </span>
-          <br />
-          Resource Gap
         </h1>
-        <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed mb-4 font-light">
-          Equilinkz is a verified global marketplace that eliminates the digital
-          divide by creating a secure, direct pipeline from corporate technology
-          surplus to the schools, universities, and non-profits that need it
-          most.
-        </p>
-        <p className="text-[14px] text-slate-400 max-w-xl mx-auto leading-relaxed mb-10">
-          Every laptop donated is a classroom equipped. Every handoff verified
-          is a community empowered. We believe that access to technology is not
-          a privilege — it is a right.
+        <p className="text-lg text-slate-500 max-w-xl mx-auto leading-relaxed mb-10 font-light">
+          Connect corporate surplus directly to schools, non-profits, and
+          communities that need it most. Free. Verified. Global.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
             onClick={onBrowse}
             className="group flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-7 py-3.5 rounded-full transition-all shadow-xl shadow-blue-200 hover:-translate-y-0.5 text-[15px]"
           >
-            Browse Surplus{" "}
+            Browse Items{" "}
             <span className="group-hover:translate-x-1 transition-transform">
               <IconArrow />
             </span>
@@ -3480,7 +3812,7 @@ function Hero({ onBrowse, onDonate }) {
             onClick={onDonate}
             className="flex items-center gap-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-medium px-7 py-3.5 rounded-full transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 text-[15px]"
           >
-            <IconPlus /> List Your Surplus
+            <IconPlus /> List Surplus
           </button>
         </div>
         <div className="mt-20 grid grid-cols-3 gap-8 max-w-lg mx-auto border-t border-slate-100 pt-10">
@@ -3499,6 +3831,9 @@ function Hero({ onBrowse, onDonate }) {
             </div>
           ))}
         </div>
+        <p className="text-[11px] text-slate-400 mt-4 tracking-widest uppercase">
+          These are our goals
+        </p>
       </div>
     </section>
   );
@@ -3555,7 +3890,7 @@ async function fetchDonorTransferCount(ownerEmail) {
 
 function AnalyticsBar({ listings, transferredCount }) {
   return (
-    <div className="grid grid-cols-3 gap-3 mb-8">
+    <div className="grid grid-cols-2 gap-3 mb-8">
       {[
         {
           label: "Total Listings",
@@ -3563,13 +3898,6 @@ function AnalyticsBar({ listings, transferredCount }) {
           color: "text-slate-900",
           bg: "bg-white",
           sub: "in marketplace",
-        },
-        {
-          label: "Available",
-          value: listings.filter((l) => l.status === "available").length,
-          color: "text-blue-600",
-          bg: "bg-blue-50",
-          sub: "ready to claim",
         },
         {
           label: "Units Transferred",
@@ -4677,22 +5005,22 @@ function ListingsSection({
             <p className="text-slate-700 font-semibold text-[15px]">
               {searchQuery
                 ? `No results for "${searchQuery}"`
-                : tab === "dashboard" && isDonor
+                : isRecipientUser
+                ? "No items available right now"
+                : isDonor && listings.length === 0
                 ? "No listings yet"
-                : tab === "dashboard" && isRecipientUser
-                ? "No active claims"
                 : "No listings match your filters"}
             </p>
             <p className="text-slate-400 text-[13px] mt-1">
               {searchQuery
                 ? "Try different keywords or clear the search"
-                : tab === "dashboard" && isDonor
-                ? "Be the first to list something!"
-                : tab === "dashboard" && isRecipientUser
-                ? "Browse available items and claim one"
+                : isRecipientUser
+                ? "Check back soon — new items are added regularly."
+                : isDonor && listings.length === 0
+                ? "Be the first to list a surplus item!"
                 : "Try adjusting your filters or region"}
             </p>
-            {!searchQuery && listings.length === 0 && (
+            {!searchQuery && listings.length === 0 && isDonor && (
               <button
                 onClick={() =>
                   document
@@ -4701,7 +5029,7 @@ function ListingsSection({
                 }
                 className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]"
               >
-                List the First Item →
+                List Your First Item →
               </button>
             )}
           </div>
@@ -5851,25 +6179,6 @@ function PartnersSection() {
               </div>
             </div>
           ))}
-        </div>
-        <div className="bg-white border border-slate-100 rounded-3xl p-10 text-center">
-          <h3 className="text-2xl font-bold text-slate-900 mb-3">
-            Become a Partner Organization
-          </h3>
-          <p className="text-slate-500 text-[14px] max-w-xl mx-auto leading-relaxed mb-6">
-            Whether you are a corporation looking to responsibly dispose of
-            surplus technology, or an institution seeking to expand your digital
-            capabilities, Equilinkz provides the infrastructure to make it
-            happen — securely, verifiably, and at no cost.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-3 rounded-full transition-all shadow-lg shadow-blue-200">
-              Apply as a Donor Organization
-            </button>
-            <button className="flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-medium px-6 py-3 rounded-full transition-all">
-              Register as a Recipient Hub
-            </button>
-          </div>
         </div>
       </div>
     </section>
@@ -7227,9 +7536,8 @@ function DashboardContent({
   // ── MESSAGES ──
   if (view === "messages") {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <h1 className="text-[22px] font-bold text-slate-900 mb-6">Messages</h1>
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="h-screen flex flex-col md:max-w-2xl md:mx-auto md:py-6 md:px-4">
+        <div className="flex-1 bg-white md:rounded-2xl border border-slate-100 md:shadow-sm overflow-hidden flex flex-col">
           <InboxModal
             user={user}
             onClose={() => setView("feed")}
@@ -7516,15 +7824,18 @@ function LandingListingPreview({ onAuth }) {
     <section className="py-20 bg-slate-50 border-t border-slate-100">
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-2 text-[12px] font-semibold text-blue-600 tracking-widest uppercase mb-3">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-            Live Marketplace
-          </span>
-          <h2 className="text-2xl font-bold text-slate-900 mb-2">
-            Real items. Real impact. Right now.
+          <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-1.5 mb-6">
+            <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
+            <span className="text-[12px] font-semibold text-green-700 tracking-widest uppercase">
+              Live right now
+            </span>
+          </div>
+          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">
+            Items waiting to be claimed.
           </h2>
-          <p className="text-slate-500 text-[14px]">
-            Sign in to see all listings, claim items, and connect with donors.
+          <p className="text-slate-500 text-[15px] max-w-md mx-auto leading-relaxed">
+            Real surplus from real organizations — sign in to see everything and
+            claim what you need.
           </p>
         </div>
 
@@ -7637,12 +7948,12 @@ function LandingListingPreview({ onAuth }) {
         </div>
 
         {/* CTA */}
-        <div className="mt-8 flex flex-col items-center gap-3">
+        <div className="mt-8 flex flex-col items-center gap-4">
           <button
             onClick={onAuth}
-            className="group flex items-center gap-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-4 rounded-2xl transition-all shadow-xl shadow-blue-200 hover:shadow-2xl hover:-translate-y-1 text-[15px]"
+            className="group flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold px-10 py-4 rounded-2xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 text-[16px]"
           >
-            Sign in to see all listings
+            Join free and browse everything
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -7657,9 +7968,26 @@ function LandingListingPreview({ onAuth }) {
               />
             </svg>
           </button>
-          <p className="text-[12px] text-slate-400">
-            Free to join. No credit card needed.
-          </p>
+          <div className="flex items-center gap-4 text-[12px] text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">
+                ✓
+              </span>{" "}
+              Free forever
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">
+                ✓
+              </span>{" "}
+              No credit card
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">
+                ✓
+              </span>{" "}
+              Verified listings
+            </span>
+          </div>
         </div>
       </div>
     </section>
@@ -7788,7 +8116,7 @@ export default function App() {
               setChatListing(l);
               setShowInbox(false);
             }}
-            listings={allListings}
+            allListings={allListings}
           />
         )}
         {/* Sign Out Confirmation */}
