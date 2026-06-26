@@ -693,6 +693,7 @@ const IconUpload = () => (
   </svg>
 );
 
+
 // ─── PinCopyButton ────────────────────────────────────────────────────────────
 function PinCopyButton({ pin }) {
   const [copied, setCopied] = useState(false);
@@ -722,7 +723,7 @@ function ExpandableDescription({ text }) {
       </p>
       {isLong && (
         <button
-          onClick={() => setExpanded((p) => !p)}
+          onClick={() => setExpanded(p => !p)}
           className="text-[12px] text-blue-600 hover:text-blue-800 font-medium mt-1"
         >
           {expanded ? "Show less" : "Show more"}
@@ -898,14 +899,10 @@ function ChatWindow({ listing, user, onClose }) {
       receiverId = listing.owner_email || "";
     } else {
       // Owner replies to the most recent non-owner sender
-      const otherMsg = [...messages]
-        .reverse()
-        .find((m) => m.sender_email && m.sender_email !== user.email);
-      receiverId =
-        otherMsg?.sender_email ||
-        otherMsg?.sender_id ||
-        listing.claimer_id ||
-        senderId;
+      const otherMsg = [...messages].reverse().find(
+        m => m.sender_email && m.sender_email !== user.email
+      );
+      receiverId = otherMsg?.sender_email || otherMsg?.sender_id || listing.claimer_id || senderId;
     }
     const tempId = "temp-" + Date.now();
 
@@ -1740,17 +1737,12 @@ function AuthModal({ onClose, onSuccess }) {
             // Empty result = username is available
             setIsUsernameTaken(false);
           } else {
-            const taken =
-              data[0]?.username?.toLowerCase() === clean.toLowerCase();
+            const taken = data[0]?.username?.toLowerCase() === clean.toLowerCase();
             setIsUsernameTaken(taken);
           }
         } else {
           // 403/404/500 — profiles table issue, never block signup
-          console.warn(
-            "Username check returned",
-            res.status,
-            "— allowing signup"
-          );
+          console.warn("Username check returned", res.status, "— allowing signup");
           setIsUsernameTaken(false);
         }
       } catch (err) {
@@ -1814,11 +1806,8 @@ function AuthModal({ onClose, onSuccess }) {
     const recipientOk =
       !isRecipient ||
       (form.institution_domain && (!taxRequired || form.tax_id));
-    const isIndividual = ["Individual Donor", "Individual Recipient"].includes(
-      form.account_type
-    );
-    const agreementsOk =
-      termsAgreed && privacyAgreed && (!isIndividual || ageConfirmed);
+    const isIndividual = ["Individual Donor", "Individual Recipient"].includes(form.account_type);
+    const agreementsOk = termsAgreed && privacyAgreed && (!isIndividual || ageConfirmed);
     const usernameOk =
       !isUsernameTaken && !checkingUsername && form.username.trim().length >= 3;
     return !!(
@@ -2260,13 +2249,7 @@ function AuthModal({ onClose, onSuccess }) {
                   I have read and agree to the
                   <a
                     href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      window.dispatchEvent(
-                        new CustomEvent("equilinkz:openPrivacy")
-                      );
-                    }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.dispatchEvent(new CustomEvent("equilinkz:openPrivacy")); }}
                     className="text-blue-600 hover:text-blue-800 font-semibold underline"
                   >
                     Terms of Service
@@ -2286,13 +2269,7 @@ function AuthModal({ onClose, onSuccess }) {
                   I have read and agree to the
                   <a
                     href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      window.dispatchEvent(
-                        new CustomEvent("equilinkz:openPrivacy")
-                      );
-                    }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.dispatchEvent(new CustomEvent("equilinkz:openPrivacy")); }}
                     className="text-blue-600 hover:text-blue-800 font-semibold underline"
                   >
                     Privacy Policy
@@ -2302,9 +2279,7 @@ function AuthModal({ onClose, onSuccess }) {
                 </p>
               </label>
               {/* Age confirmation — only for individual accounts */}
-              {["Individual Donor", "Individual Recipient"].includes(
-                form.account_type
-              ) && (
+              {["Individual Donor", "Individual Recipient"].includes(form.account_type) && (
                 <label className="flex items-start gap-3 cursor-pointer group">
                   <input
                     type="checkbox"
@@ -2313,10 +2288,7 @@ function AuthModal({ onClose, onSuccess }) {
                     className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
                   />
                   <p className="text-[12px] text-slate-600 leading-relaxed">
-                    I confirm that I am{" "}
-                    <strong>18 years of age or older</strong>. If I am under 18,
-                    I confirm that I have obtained parental or guardian consent
-                    to use this platform.
+                    I confirm that I am <strong>18 years of age or older</strong>. If I am under 18, I confirm that I have obtained parental or guardian consent to use this platform.
                   </p>
                 </label>
               )}
@@ -2449,7 +2421,7 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
   useEffect(() => {
     if (fetchPin && (realPin === null || realPin === undefined)) {
       setPinLoading(true);
-      fetchPin().then((p) => {
+      fetchPin().then(p => {
         if (p !== null) setRealPin(p);
         setPinLoading(false);
       });
@@ -2863,15 +2835,7 @@ function SettingsModal({ user, onClose, onUpdated, onDeleted }) {
 }
 
 // ─── Inbox Modal ─────────────────────────────────────────────────────────────
-function InboxModal({
-  user,
-  onClose,
-  onOpenChat,
-  allListings,
-  inline,
-  autoOpenListing,
-  onAutoOpenHandled,
-}) {
+function InboxModal({ user, onClose, onOpenChat, allListings, inline, autoOpenListing, onAutoOpenHandled }) {
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeListing, setActiveListing] = useState(null);
@@ -2884,13 +2848,7 @@ function InboxModal({
   // Auto-open a listing chat when navigating from a listing card
   useEffect(() => {
     if (autoOpenListing && !activeListing) {
-      setActiveListing({
-        ...autoOpenListing,
-        _otherName:
-          autoOpenListing.owner_org_name ||
-          autoOpenListing.owner_email ||
-          "Donor",
-      });
+      setActiveListing({ ...autoOpenListing, _otherName: autoOpenListing.owner_org_name || autoOpenListing.owner_email || "Donor" });
       if (onAutoOpenHandled) onAutoOpenHandled();
     }
   }, [autoOpenListing]);
@@ -2900,11 +2858,7 @@ function InboxModal({
     setLoading(true);
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/messages?or=(sender_email.eq.${encodeURIComponent(
-          user.email
-        )},receiver_id.eq.${encodeURIComponent(
-          user.email
-        )})&order=created_at.desc&select=*&limit=300`,
+        `${SUPABASE_URL}/messages?or=(sender_email.eq.${encodeURIComponent(user.email)},receiver_id.eq.${encodeURIComponent(user.email)})&order=created_at.desc&select=*&limit=300`,
         { headers: getHeaders(getToken()) }
       );
       if (!res.ok) return;
@@ -2918,45 +2872,22 @@ function InboxModal({
       });
       const threadList = Object.entries(grouped).map(([lid, messages]) => {
         const last = messages[0];
-        const otherEmail =
-          last?.sender_email === user.email
-            ? last?.receiver_id
-            : last?.sender_email;
-        const otherName =
-          messages.find((m) => m.sender_email !== user.email)?.sender_name ||
-          otherEmail ||
-          "User";
-        const unread = messages.filter(
-          (m) =>
-            m.sender_email !== user.email && !m.read_by?.includes(user.email)
-        ).length;
-        const listing = (allListings || []).find((l) => String(l.id) === lid);
-        return {
-          listing_id: lid,
-          last,
-          unread,
-          listing,
-          otherName,
-          otherEmail,
-        };
+        const otherEmail = last?.sender_email === user.email
+          ? last?.receiver_id
+          : last?.sender_email;
+        const otherName = messages.find(m => m.sender_email !== user.email)?.sender_name || otherEmail || "User";
+        const unread = messages.filter(m => m.sender_email !== user.email && !m.read_by?.includes(user.email)).length;
+        const listing = (allListings || []).find(l => String(l.id) === lid);
+        return { listing_id: lid, last, unread, listing, otherName, otherEmail };
       });
       setThreads(threadList);
-    } catch (_) {
-    } finally {
-      setLoading(false);
-    }
+    } catch (_) {}
+    finally { setLoading(false); }
   };
 
   const initials = (name) => (name || "U").slice(0, 2).toUpperCase();
   const avatarColor = (name) => {
-    const colors = [
-      "bg-blue-500",
-      "bg-purple-500",
-      "bg-green-500",
-      "bg-amber-500",
-      "bg-rose-500",
-      "bg-teal-500",
-    ];
+    const colors = ["bg-blue-500","bg-purple-500","bg-green-500","bg-amber-500","bg-rose-500","bg-teal-500"];
     return colors[(name || "U").charCodeAt(0) % colors.length];
   };
 
@@ -2966,38 +2897,15 @@ function InboxModal({
       <div className="flex flex-col h-full min-h-0 flex-1">
         {/* Chat header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 bg-white shrink-0">
-          <button
-            onClick={() => setActiveListing(null)}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-all"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="w-4 h-4"
-            >
-              <path
-                d="M19 12H5M12 5l-7 7 7 7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+          <button onClick={() => setActiveListing(null)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 transition-all">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M19 12H5M12 5l-7 7 7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
-          <div
-            className={`w-9 h-9 rounded-full ${avatarColor(
-              activeListing._otherName
-            )} flex items-center justify-center text-white font-bold text-[13px] shrink-0`}
-          >
+          <div className={`w-9 h-9 rounded-full ${avatarColor(activeListing._otherName)} flex items-center justify-center text-white font-bold text-[13px] shrink-0`}>
             {initials(activeListing._otherName)}
           </div>
           <div className="min-w-0">
-            <p className="text-[14px] font-bold text-slate-900 truncate">
-              {activeListing._otherName}
-            </p>
-            <p className="text-[11px] text-slate-400 truncate">
-              {activeListing.title}
-            </p>
+            <p className="text-[14px] font-bold text-slate-900 truncate">{activeListing._otherName}</p>
+            <p className="text-[11px] text-slate-400 truncate">{activeListing.title}</p>
           </div>
         </div>
         {/* Inline chat body */}
@@ -3011,19 +2919,12 @@ function InboxModal({
     <div className="flex flex-col h-full">
       <div className="px-5 py-4 border-b border-slate-100 shrink-0 flex items-center justify-between">
         <h2 className="text-[18px] font-bold text-slate-900">Messages</h2>
-        {!inline && (
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
-          >
-            <IconX />
-          </button>
-        )}
+        {!inline && <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"><IconX /></button>}
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex flex-col gap-3 p-4">
-            {[1, 2, 3].map((i) => (
+            {[1,2,3].map(i => (
               <div key={i} className="flex items-center gap-3 animate-pulse">
                 <div className="w-12 h-12 bg-slate-100 rounded-full shrink-0" />
                 <div className="flex-1 space-y-2">
@@ -3036,26 +2937,10 @@ function InboxModal({
         ) : threads.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-20 text-center px-6">
             <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                className="w-8 h-8 text-slate-400"
-              >
-                <path
-                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-400"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
-            <p className="text-[15px] font-semibold text-slate-700 mb-1">
-              No messages yet
-            </p>
-            <p className="text-[13px] text-slate-400">
-              Open a listing and tap Message to start a conversation
-            </p>
+            <p className="text-[15px] font-semibold text-slate-700 mb-1">No messages yet</p>
+            <p className="text-[13px] text-slate-400">Open a listing and tap Message to start a conversation</p>
           </div>
         ) : (
           <div>
@@ -3070,41 +2955,20 @@ function InboxModal({
                 }}
                 className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-50 text-left"
               >
-                <div
-                  className={`w-12 h-12 rounded-full ${avatarColor(
-                    otherName
-                  )} flex items-center justify-center text-white font-bold text-[15px] shrink-0`}
-                >
+                <div className={`w-12 h-12 rounded-full ${avatarColor(otherName)} flex items-center justify-center text-white font-bold text-[15px] shrink-0`}>
                   {initials(otherName)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-0.5">
-                    <p
-                      className={`text-[14px] truncate ${
-                        unread > 0
-                          ? "font-bold text-slate-900"
-                          : "font-semibold text-slate-700"
-                      }`}
-                    >
+                    <p className={`text-[14px] truncate ${unread > 0 ? "font-bold text-slate-900" : "font-semibold text-slate-700"}`}>
                       {otherName}
                     </p>
-                    <p className="text-[11px] text-slate-400 shrink-0">
-                      {timeAgo(last?.created_at)}
-                    </p>
+                    <p className="text-[11px] text-slate-400 shrink-0">{timeAgo(last?.created_at)}</p>
                   </div>
-                  <p
-                    className={`text-[13px] truncate ${
-                      unread > 0
-                        ? "font-semibold text-slate-800"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    {last?.sender_email === user.email ? "You: " : ""}
-                    {last?.message_text || ""}
+                  <p className={`text-[13px] truncate ${unread > 0 ? "font-semibold text-slate-800" : "text-slate-400"}`}>
+                    {last?.sender_email === user.email ? "You: " : ""}{last?.message_text || ""}
                   </p>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                    {listing?.title || "Listing"}
-                  </p>
+                  <p className="text-[11px] text-slate-400 truncate mt-0.5">{listing?.title || "Listing"}</p>
                 </div>
                 {unread > 0 && (
                   <div className="w-2.5 h-2.5 bg-blue-500 rounded-full shrink-0" />
@@ -3121,10 +2985,7 @@ function InboxModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl h-[80vh] flex flex-col overflow-hidden">
         {content}
       </div>
@@ -3160,9 +3021,7 @@ function InlineChatBody({ listing, user }) {
     if (!listing?.id || !isMounted.current) return;
     try {
       const res = await fetch(
-        `${SUPABASE_URL}/messages?listing_id=eq.${encodeURIComponent(
-          String(listing.id)
-        )}&order=created_at.asc&select=*&limit=200`,
+        `${SUPABASE_URL}/messages?listing_id=eq.${encodeURIComponent(String(listing.id))}&order=created_at.asc&select=*&limit=200`,
         { headers: getHeaders(getToken()) }
       );
       if (!res.ok || !isMounted.current) return;
@@ -3170,25 +3029,17 @@ function InlineChatBody({ listing, user }) {
       if (Array.isArray(data) && isMounted.current) {
         setMessages(data);
         // Mark received messages as read
-        const unread = data.filter(
-          (m) =>
-            m.sender_email !== user?.email &&
-            !(m.read_by || []).includes(user?.email)
-        );
-        unread.forEach((m) => {
+        const unread = data.filter(m => m.sender_email !== user?.email && !(m.read_by || []).includes(user?.email));
+        unread.forEach(m => {
           fetch(`${SUPABASE_URL}/messages?id=eq.${m.id}`, {
             method: "PATCH",
             headers: getHeaders(getToken()),
-            body: JSON.stringify({
-              read_by: [...(m.read_by || []), user.email],
-            }),
+            body: JSON.stringify({ read_by: [...(m.read_by || []), user.email] }),
           }).catch(() => {});
         });
       }
-    } catch (_) {
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
+    } catch (_) {}
+    finally { if (isMounted.current) setLoading(false); }
   };
 
   const send = async () => {
@@ -3204,31 +3055,22 @@ function InlineChatBody({ listing, user }) {
     if (!isOwner) {
       receiverId = listing.owner_email || "";
     } else {
-      const otherMsg = [...messages]
-        .reverse()
-        .find((m) => m.sender_email && m.sender_email !== user.email);
+      const otherMsg = [...messages].reverse().find(m => m.sender_email && m.sender_email !== user.email);
       receiverId = otherMsg?.sender_email || otherMsg?.sender_id || senderId;
     }
     // Optimistic update
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: "temp-" + Date.now(),
-        listing_id: String(listing.id),
-        sender_id: senderId,
-        sender_email: senderEmail,
-        sender_name: senderName,
-        receiver_id: receiverId,
-        message_text: text,
-        created_at: new Date().toISOString(),
-      },
-    ]);
+    setMessages(prev => [...prev, {
+      id: "temp-" + Date.now(),
+      listing_id: String(listing.id),
+      sender_id: senderId, sender_email: senderEmail,
+      sender_name: senderName, receiver_id: receiverId,
+      message_text: text, created_at: new Date().toISOString(),
+    }]);
     try {
       const h = getHeaders(getToken());
       h["Prefer"] = "return=representation";
       const res = await fetch(SUPABASE_URL + "/messages", {
-        method: "POST",
-        headers: h,
+        method: "POST", headers: h,
         body: JSON.stringify({
           listing_id: String(listing.id),
           sender_id: String(senderId),
@@ -3243,18 +3085,12 @@ function InlineChatBody({ listing, user }) {
         const e = await res.json().catch(() => ({}));
         console.error("MSG ERROR:", res.status, e);
       }
-    } catch (err) {
-      console.error("MSG SEND:", err.message);
-    } finally {
-      setSending(false);
-    }
+    } catch (err) { console.error("MSG SEND:", err.message); }
+    finally { setSending(false); }
   };
 
   const handleKey = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      send();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
   };
 
   return (
@@ -3262,90 +3098,39 @@ function InlineChatBody({ listing, user }) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {loading ? (
-          <div className="flex justify-center py-10">
-            <IconLoader />
-          </div>
+          <div className="flex justify-center py-10"><IconLoader /></div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-16 text-center">
             <div className="w-14 h-14 bg-white border border-slate-100 rounded-full flex items-center justify-center mb-3 shadow-sm">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                className="w-7 h-7 text-slate-300"
-              >
-                <path
-                  d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7 text-slate-300"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
-            <p className="text-[14px] font-semibold text-slate-600">
-              Start the conversation
-            </p>
-            <p className="text-[12px] text-slate-400 mt-1">
-              Say hello to get things started
-            </p>
+            <p className="text-[14px] font-semibold text-slate-600">Start the conversation</p>
+            <p className="text-[12px] text-slate-400 mt-1">Say hello to get things started</p>
           </div>
         ) : (
           messages.map((msg) => {
-            const isMe =
-              msg.sender_email === user?.email ||
-              msg.sender_id === user?.id ||
-              msg.sender_id === user?.email;
+            const isMe = msg.sender_email === user?.email || msg.sender_id === user?.id || msg.sender_id === user?.email;
             const isTemp = String(msg.id).startsWith("temp-");
             return (
-              <div
-                key={msg.id}
-                className={`flex flex-col ${
-                  isMe ? "items-end" : "items-start"
-                }`}
-              >
+              <div key={msg.id} className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                 {!isMe && (
-                  <p className="text-[10px] font-semibold text-slate-500 mb-1 px-1">
-                    {msg.sender_name || "User"}
-                  </p>
+                  <p className="text-[10px] font-semibold text-slate-500 mb-1 px-1">{msg.sender_name || "User"}</p>
                 )}
-                <div
-                  className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${
-                    isMe
-                      ? "bg-blue-600 text-white rounded-br-sm"
-                      : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm shadow-sm"
-                  } ${isTemp ? "opacity-60" : ""}`}
-                >
-                  <p className="break-words whitespace-pre-wrap">
-                    {msg.message_text || msg.body || msg.text || ""}
-                  </p>
-                  <div
-                    className={`flex items-center gap-1 mt-1 ${
-                      isMe ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    <p
-                      className={`text-[10px] ${
-                        isMe ? "text-blue-200" : "text-slate-400"
-                      }`}
-                    >
-                      {isTemp
-                        ? "sending…"
-                        : new Date(msg.created_at).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${
+                  isMe
+                    ? "bg-blue-600 text-white rounded-br-sm"
+                    : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm shadow-sm"
+                } ${isTemp ? "opacity-60" : ""}`}>
+                  <p className="break-words whitespace-pre-wrap">{msg.message_text || msg.body || msg.text || ""}</p>
+                  <div className={`flex items-center gap-1 mt-1 ${isMe ? "justify-end" : "justify-start"}`}>
+                    <p className={`text-[10px] ${isMe ? "text-blue-200" : "text-slate-400"}`}>
+                      {isTemp ? "sending…" : new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
                     {isMe && !isTemp && (
                       <span className="text-[11px] leading-none">
-                        {msg.read_by && msg.read_by.length > 0 ? (
-                          <span className="text-blue-300" title="Seen">
-                            ✓✓
-                          </span>
-                        ) : (
-                          <span className="text-blue-200" title="Delivered">
-                            ✓
-                          </span>
-                        )}
+                        {msg.read_by && msg.read_by.length > 0
+                          ? <span className="text-blue-300" title="Seen">✓✓</span>
+                          : <span className="text-blue-200" title="Delivered">✓</span>}
                       </span>
                     )}
                   </div>
@@ -3360,7 +3145,7 @@ function InlineChatBody({ listing, user }) {
       <div className="px-4 py-3 bg-white border-t border-slate-100 flex items-end gap-2 shrink-0">
         <textarea
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
           rows={1}
           placeholder="Message…"
@@ -3581,6 +3366,7 @@ function CertificateModal({ listing, onClose }) {
   );
 }
 
+
 // ─── Toast Notification System ────────────────────────────────────────────────
 const ToastContext = React.createContext(null);
 
@@ -3588,29 +3374,18 @@ function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const addToast = useCallback((message, type = "success") => {
     const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(
-      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
-      3500
-    );
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3500);
   }, []);
   return (
     <ToastContext.Provider value={addToast}>
       {children}
       <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none">
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`flex items-center gap-2 px-5 py-3 rounded-2xl shadow-2xl text-white text-[13px] font-semibold animate-bounce-in pointer-events-auto ${
-              t.type === "success"
-                ? "bg-green-600"
-                : t.type === "error"
-                ? "bg-red-600"
-                : "bg-blue-600"
-            }`}
-          >
-            {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"}{" "}
-            {t.message}
+        {toasts.map(t => (
+          <div key={t.id} className={`flex items-center gap-2 px-5 py-3 rounded-2xl shadow-2xl text-white text-[13px] font-semibold animate-bounce-in pointer-events-auto ${
+            t.type === "success" ? "bg-green-600" : t.type === "error" ? "bg-red-600" : "bg-blue-600"
+          }`}>
+            {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"} {t.message}
           </div>
         ))}
       </div>
@@ -3622,43 +3397,26 @@ function useToast() {
   return React.useContext(ToastContext) || (() => {});
 }
 
+
 // ─── Cookie Consent Banner ────────────────────────────────────────────────────
 function CookieBanner({ onPrivacy }) {
-  const [visible, setVisible] = useState(
-    () => !localStorage.getItem("eq_cookie_consent")
-  );
+  const [visible, setVisible] = useState(() => !localStorage.getItem("eq_cookie_consent"));
   if (!visible) return null;
   return (
     <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-[45] bg-slate-900 border-t border-slate-700 px-6 py-4">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <p className="text-[13px] text-slate-300 leading-relaxed max-w-2xl">
-          🍪 We use essential cookies to keep you signed in and improve your
-          experience. By using Equilinkz, you agree to our{" "}
-          <button
-            onClick={onPrivacy}
-            className="text-blue-400 hover:text-blue-300 underline font-medium"
-          >
-            Privacy Policy
-          </button>
-          . We never sell your data.
+          🍪 We use essential cookies to keep you signed in and improve your experience. By using Equilinkz, you agree to our{" "}
+          <button onClick={onPrivacy} className="text-blue-400 hover:text-blue-300 underline font-medium">Privacy Policy</button>.
+          We never sell your data.
         </p>
         <div className="flex gap-3 shrink-0">
-          <button
-            onClick={() => {
-              localStorage.setItem("eq_cookie_consent", "true");
-              setVisible(false);
-            }}
-            className="bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold px-5 py-2.5 rounded-xl transition-all"
-          >
+          <button onClick={() => { localStorage.setItem("eq_cookie_consent", "true"); setVisible(false); }}
+            className="bg-blue-600 hover:bg-blue-700 text-white text-[13px] font-semibold px-5 py-2.5 rounded-xl transition-all">
             Accept
           </button>
-          <button
-            onClick={() => {
-              localStorage.setItem("eq_cookie_consent", "declined");
-              setVisible(false);
-            }}
-            className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-[13px] font-medium px-4 py-2.5 rounded-xl transition-all"
-          >
+          <button onClick={() => { localStorage.setItem("eq_cookie_consent", "declined"); setVisible(false); }}
+            className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-[13px] font-medium px-4 py-2.5 rounded-xl transition-all">
             Decline
           </button>
         </div>
@@ -3666,6 +3424,7 @@ function CookieBanner({ onPrivacy }) {
     </div>
   );
 }
+
 
 // ─── Back To Top Button ───────────────────────────────────────────────────────
 function BackToTopButton() {
@@ -3682,22 +3441,13 @@ function BackToTopButton() {
       className="fixed bottom-20 md:bottom-8 right-6 z-[140] w-11 h-11 bg-slate-900 hover:bg-blue-600 text-white rounded-full shadow-xl flex items-center justify-center transition-all hover:-translate-y-1"
       title="Back to top"
     >
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2.5"
-        className="w-4 h-4"
-      >
-        <path
-          d="M18 15l-6-6-6 6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4">
+        <path d="M18 15l-6-6-6 6" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
     </button>
   );
 }
+
 
 // ─── How It Works Section ─────────────────────────────────────────────────────
 function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
@@ -3734,80 +3484,40 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
     },
   ];
   return (
-    <section
-      id="how-it-works"
-      className="py-24 bg-white border-t border-slate-100"
-    >
+    <section id="how-it-works" className="py-24 bg-white border-t border-slate-100">
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-14">
           <div className="flex items-center justify-center gap-2 mb-3">
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse" />
-            <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest">
-              How It Works
-            </span>
+            <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest">How It Works</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-3">
-            Three steps. Real impact.
-          </h2>
+          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight mb-3">Three steps. Real impact.</h2>
           <p className="text-slate-500 max-w-md mx-auto text-[15px] leading-relaxed">
             From surplus to purpose — fast, free, and fully verified.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {steps.map((step, i) => (
-            <div
-              key={step.number}
-              className={`relative border rounded-3xl p-8 flex flex-col gap-5 ${step.color}`}
-            >
+            <div key={step.number} className={`relative border rounded-3xl p-8 flex flex-col gap-5 ${step.color}`}>
               <div className="flex items-center justify-between">
-                <span
-                  className={`text-5xl font-black tracking-tight opacity-20 ${step.numberColor}`}
-                >
-                  {step.number}
-                </span>
+                <span className={`text-5xl font-black tracking-tight opacity-20 ${step.numberColor}`}>{step.number}</span>
                 <span className="text-4xl">{step.icon}</span>
               </div>
               <div>
-                <h3 className="text-[18px] font-bold text-slate-900 mb-2">
-                  {step.title}
-                </h3>
-                <p className="text-[13px] text-slate-500 leading-relaxed">
-                  {step.desc}
-                </p>
+                <h3 className="text-[18px] font-bold text-slate-900 mb-2">{step.title}</h3>
+                <p className="text-[13px] text-slate-500 leading-relaxed">{step.desc}</p>
               </div>
-              <button
-                onClick={step.action}
-                className="mt-auto flex items-center gap-2 text-[13px] font-semibold text-slate-700 hover:text-blue-600 transition-colors group"
-              >
+              <button onClick={step.action}
+                className="mt-auto flex items-center gap-2 text-[13px] font-semibold text-slate-700 hover:text-blue-600 transition-colors group">
                 {step.cta}
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-                >
-                  <path
-                    d="M5 12h14M12 5l7 7-7 7"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 group-hover:translate-x-1 transition-transform">
+                  <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
               {i < 2 && (
                 <div className="hidden md:block absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-8 h-8 bg-white border border-slate-200 rounded-full flex items-center justify-center shadow-sm">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    className="w-3 h-3 text-slate-400"
-                  >
-                    <path
-                      d="M9 18l6-6-6-6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3 h-3 text-slate-400">
+                    <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/>
                   </svg>
                 </div>
               )}
@@ -3816,24 +3526,14 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
         </div>
         <div className="mt-10 bg-slate-900 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
-            <p className="text-white font-bold text-[18px] mb-1">
-              Ready to make an impact?
-            </p>
-            <p className="text-slate-400 text-[13px]">
-              Join Equilinkz today — free for donors and recipients worldwide.
-            </p>
+            <p className="text-white font-bold text-[18px] mb-1">Ready to make an impact?</p>
+            <p className="text-slate-400 text-[13px]">Join Equilinkz today — free for donors and recipients worldwide.</p>
           </div>
           <div className="flex gap-3">
-            <button
-              onClick={onDonate}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]"
-            >
+            <button onClick={onDonate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]">
               List Surplus
             </button>
-            <button
-              onClick={onBrowse}
-              className="bg-white/10 hover:bg-white/20 text-white font-medium px-6 py-3 rounded-xl transition-all text-[14px] border border-white/20"
-            >
+            <button onClick={onBrowse} className="bg-white/10 hover:bg-white/20 text-white font-medium px-6 py-3 rounded-xl transition-all text-[14px] border border-white/20">
               Browse Items
             </button>
           </div>
@@ -3878,8 +3578,7 @@ function Hero({ onBrowse, onDonate }) {
           </span>
         </h1>
         <p className="text-lg text-slate-500 max-w-xl mx-auto leading-relaxed mb-10 font-light">
-          Connect corporate surplus directly to schools, non-profits, and
-          communities that need it most. Free. Verified. Global.
+          Connect corporate surplus directly to schools, non-profits, and communities that need it most. Free. Verified. Global.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
@@ -3905,18 +3604,12 @@ function Hero({ onBrowse, onDonate }) {
             { value: "60+", label: "Countries" },
           ].map(({ value, label }) => (
             <div key={label} className="text-center">
-              <div className="text-2xl font-bold text-slate-900 tracking-tight">
-                {value}
-              </div>
-              <div className="text-[12px] text-slate-400 mt-0.5 font-medium">
-                {label}
-              </div>
+              <div className="text-2xl font-bold text-slate-900 tracking-tight">{value}</div>
+              <div className="text-[12px] text-slate-400 mt-0.5 font-medium">{label}</div>
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-slate-400 mt-4 tracking-widest uppercase">
-          These are our goals
-        </p>
+        <p className="text-[11px] text-slate-400 mt-4 tracking-widest uppercase">These are our goals</p>
       </div>
     </section>
   );
@@ -3932,43 +3625,32 @@ async function incrementDonorTransfers(ownerEmail, token) {
   try {
     // Fetch current count
     const res = await fetch(
-      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
-        ownerEmail
-      )}&select=transfers_completed`,
+      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}&select=transfers_completed`,
       { headers: getHeaders(token) }
     );
     if (!res.ok) return;
     const data = await res.json();
     const current = (Array.isArray(data) && data[0]?.transfers_completed) || 0;
     // Increment
-    await fetch(
-      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}`,
-      {
-        method: "PATCH",
-        headers: getHeaders(token),
-        body: JSON.stringify({ transfers_completed: current + 1 }),
-      }
-    );
-  } catch (e) {
-    console.warn("Could not update donor transfer count:", e.message);
-  }
+    await fetch(`${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}`, {
+      method: "PATCH",
+      headers: getHeaders(token),
+      body: JSON.stringify({ transfers_completed: current + 1 }),
+    });
+  } catch (e) { console.warn("Could not update donor transfer count:", e.message); }
 }
 
 async function fetchDonorTransferCount(ownerEmail) {
   if (!ownerEmail) return 0;
   try {
     const res = await fetch(
-      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
-        ownerEmail
-      )}&select=transfers_completed`,
+      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}&select=transfers_completed`,
       { headers: getHeaders(null) }
     );
     if (!res.ok) return 0;
     const data = await res.json();
     return (Array.isArray(data) && data[0]?.transfers_completed) || 0;
-  } catch {
-    return 0;
-  }
+  } catch { return 0; }
 }
 
 function AnalyticsBar({ listings, transferredCount }) {
@@ -4145,11 +3827,7 @@ function ListingCard({
   const [deleting, setDeleting] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editForm, setEditForm] = useState({
-    title: listing.title || "",
-    description: listing.description || "",
-    quantity: listing.quantity || "",
-  });
+  const [editForm, setEditForm] = useState({ title: listing.title || "", description: listing.description || "", quantity: listing.quantity || "" });
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
   const [flagged, setFlagged] = useState((listing.flags || 0) > 0);
@@ -4247,8 +3925,7 @@ function ListingCard({
       if (res.ok) {
         onClaim(listing.id, parseInt(pin, 10));
         if (onShowPin) onShowPin(pin);
-        if (onToast)
-          onToast("Item claimed! Show your PIN to the donor.", "success");
+        if (onToast) onToast("Item claimed! Show your PIN to the donor.", "success");
         createNotification(
           listing.owner_email,
           "claim",
@@ -4269,10 +3946,7 @@ function ListingCard({
   };
 
   const handleEdit = async () => {
-    if (!editForm.title.trim()) {
-      setEditError("Title is required.");
-      return;
-    }
+    if (!editForm.title.trim()) { setEditError("Title is required."); return; }
     setEditSaving(true);
     setEditError(null);
     try {
@@ -4289,9 +3963,7 @@ function ListingCard({
       // Update listing in UI by patching local object
       listing.title = editForm.title.trim();
       listing.description = editForm.description.trim();
-      listing.quantity = editForm.quantity
-        ? parseInt(editForm.quantity, 10)
-        : null;
+      listing.quantity = editForm.quantity ? parseInt(editForm.quantity, 10) : null;
       setShowEditModal(false);
       if (onToast) onToast("Listing updated!", "success");
     } catch (err) {
@@ -4395,9 +4067,7 @@ function ListingCard({
                 </span>
               )}
               {listing.created_at && (
-                <span className="text-[10px] text-slate-400">
-                  {timeAgo(listing.created_at)}
-                </span>
+                <span className="text-[10px] text-slate-400">{timeAgo(listing.created_at)}</span>
               )}
             </div>
           </div>
@@ -4410,11 +4080,8 @@ function ListingCard({
                 {ownerBadge.label}
               </span>
             )}
-            {listing.owner_transfers_completed >= 3 && (
-              <span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700"
-                title="Completed 3+ verified transfers"
-              >
+            {(listing.owner_transfers_completed >= 3) && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700" title="Completed 3+ verified transfers">
                 ✓ Trusted Donor
               </span>
             )}
@@ -4481,17 +4148,14 @@ function ListingCard({
                     <IconEmail /> {listing.owner_email}
                   </a>
                 )}
-                {listing.owner_phone &&
-                  user &&
-                  (user.email === listing.owner_email ||
-                    user.email === listing.claimer_id) && (
-                    <a
-                      href={`tel:${listing.owner_phone}`}
-                      className="flex items-center gap-2 text-[12px] text-green-600 hover:text-green-800 font-medium"
-                    >
-                      <IconPhone /> {listing.owner_phone}
-                    </a>
-                  )}
+                {listing.owner_phone && user && (user.email === listing.owner_email || user.email === listing.claimer_id) && (
+                  <a
+                    href={`tel:${listing.owner_phone}`}
+                    className="flex items-center gap-2 text-[12px] text-green-600 hover:text-green-800 font-medium"
+                  >
+                    <IconPhone /> {listing.owner_phone}
+                  </a>
+                )}
                 {!listing.owner_email && !listing.owner_phone && (
                   <p className="text-[12px] text-slate-400 italic">
                     No contact info provided.
@@ -4546,39 +4210,14 @@ function ListingCard({
                 </div>
                 {/* Edit + Delete — only while item is still available */}
                 {!isDone && (
-                  <div
-                    className="flex items-center gap-2"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                     <button
-                      onClick={() => {
-                        setEditForm({
-                          title: listing.title || "",
-                          description: listing.description || "",
-                          quantity: listing.quantity || "",
-                        });
-                        setEditError(null);
-                        setShowEditModal(true);
-                      }}
+                      onClick={() => { setEditForm({ title: listing.title || "", description: listing.description || "", quantity: listing.quantity || "" }); setEditError(null); setShowEditModal(true); }}
                       className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-200 rounded-lg px-2.5 py-1 transition-all"
                     >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        className="w-3 h-3"
-                      >
-                        <path
-                          d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                        <path
-                          d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                        <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                       Edit
                     </button>
@@ -4590,18 +4229,8 @@ function ListingCard({
                       {deleting ? (
                         <IconLoader />
                       ) : (
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          className="w-3 h-3"
-                        >
-                          <path
-                            d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3 h-3">
+                          <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       )}
                       Delete
@@ -4621,10 +4250,7 @@ function ListingCard({
                       </span>
                     ) : (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleClaim();
-                        }}
+                        onClick={(e) => { e.stopPropagation(); handleClaim(); }}
                         disabled={claiming || !user}
                         className={`flex items-center gap-1.5 text-[12px] font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-sm ${
                           !user
@@ -4647,51 +4273,29 @@ function ListingCard({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(
-                        `${window.location.origin}?listing=${listing.id}`
-                      );
+                      navigator.clipboard.writeText(`${window.location.origin}?listing=${listing.id}`);
                       if (onToast) onToast("Link copied!", "success");
                     }}
                     className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-blue-500 transition-all"
                     title="Copy listing link"
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="w-3.5 h-3.5"
-                    >
-                      <path
-                        d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5">
+                      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </button>
                   {/* WhatsApp share */}
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const text = encodeURIComponent(
-                        `Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`
-                      );
+                      const text = encodeURIComponent(`Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`);
                       window.open(`https://wa.me/?text=${text}`, "_blank");
                     }}
                     className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-green-500 transition-all"
                     title="Share on WhatsApp"
                   >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="currentColor"
-                      className="w-3.5 h-3.5"
-                    >
-                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
                     </svg>
                   </button>
                   {/* Flag — claimers only, not owners */}
@@ -4724,66 +4328,40 @@ function ListingCard({
       {/* Edit Listing Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-            onClick={() => setShowEditModal(false)}
-          />
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
-            <button
-              onClick={() => setShowEditModal(false)}
-              className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
-            >
-              <IconX />
-            </button>
-            <h3 className="text-lg font-bold text-slate-900 mb-5">
-              Edit Listing
-            </h3>
-            {editError && (
-              <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">
-                {editError}
-              </div>
-            )}
+            <button onClick={() => setShowEditModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"><IconX /></button>
+            <h3 className="text-lg font-bold text-slate-900 mb-5">Edit Listing</h3>
+            {editError && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">{editError}</div>}
             <div className="space-y-4">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                  Title *
-                </label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Title *</label>
                 <input
                   value={editForm.title}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, title: e.target.value }))
-                  }
+                  onChange={(e) => setEditForm(f => ({ ...f, title: e.target.value }))}
                   className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="Item title"
                   maxLength={120}
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                  Description
-                </label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Description</label>
                 <textarea
                   rows={3}
                   value={editForm.description}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, description: e.target.value }))
-                  }
+                  onChange={(e) => setEditForm(f => ({ ...f, description: e.target.value }))}
                   className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
                   placeholder="Condition, specs, details…"
                   maxLength={300}
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                  Quantity
-                </label>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Quantity</label>
                 <input
                   type="number"
                   min="1"
                   value={editForm.quantity}
-                  onChange={(e) =>
-                    setEditForm((f) => ({ ...f, quantity: e.target.value }))
-                  }
+                  onChange={(e) => setEditForm(f => ({ ...f, quantity: e.target.value }))}
                   className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   placeholder="e.g. 10"
                 />
@@ -4793,15 +4371,7 @@ function ListingCard({
                 disabled={editSaving}
                 className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]"
               >
-                {editSaving ? (
-                  <>
-                    <IconLoader /> Saving…
-                  </>
-                ) : (
-                  <>
-                    <IconCheck /> Save Changes
-                  </>
-                )}
+                {editSaving ? <><IconLoader /> Saving…</> : <><IconCheck /> Save Changes</>}
               </button>
             </div>
           </div>
@@ -4832,9 +4402,7 @@ function ListingCard({
               if (!res.ok) return null;
               const data = await res.json();
               return data?.[0]?.verification_pin ?? null;
-            } catch {
-              return null;
-            }
+            } catch { return null; }
           }}
         />
       )}
@@ -4880,16 +4448,10 @@ function ListingCard({
               Medical Supplies Request
             </h3>
             <p className="text-[13px] text-slate-500 mb-2 leading-relaxed">
-              For safety, please briefly explain why your organization needs
-              these medical supplies (max 60 words).
+              For safety, please briefly explain why your organization needs these medical supplies (max 60 words).
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
-              <p className="text-[11px] text-amber-700 font-medium">
-                ⚠️ Disclaimer: Equilinkz does not verify the safety or
-                suitability of medical supplies. All transfers are at the
-                recipient's own risk. Consult a qualified medical professional
-                before use.
-              </p>
+              <p className="text-[11px] text-amber-700 font-medium">⚠️ Disclaimer: Equilinkz does not verify the safety or suitability of medical supplies. All transfers are at the recipient's own risk. Consult a qualified medical professional before use.</p>
             </div>
             <textarea
               value={medReason}
@@ -4942,7 +4504,7 @@ function ListingsSection({
   const [catFilter, setCatFilter] = useState("All");
   const [regionFilter, setRegionFilter] = useState("All Regions");
   const [locationSearch, setLocationSearch] = useState("");
-  const [locationInput, setLocationInput] = useState("");
+  const [locationInput,  setLocationInput]  = useState("");
   const locationDebounce = useRef(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -4997,9 +4559,7 @@ function ListingsSection({
   useEffect(() => {
     fetchListings();
   }, [refreshTrigger]);
-  useEffect(() => {
-    setVisibleCount(9);
-  }, [catFilter, regionFilter, locationSearch, searchQuery, tab]);
+  useEffect(() => { setVisibleCount(9); }, [catFilter, regionFilter, locationSearch, searchQuery, tab]);
 
   // ── RBAC: Derive role ─────────────────────────────────────────────────────
   const isDonor =
@@ -5029,8 +4589,8 @@ function ListingsSection({
     }
   }
   if (tab === "claims" && user) {
-    filtered = filtered.filter(
-      (l) => l.claimer_id === user.email || l.claimer_id === user.id
+    filtered = filtered.filter(l =>
+      l.claimer_id === user.email || l.claimer_id === user.id
     );
   }
   if (catFilter !== "All")
@@ -5100,32 +4660,21 @@ function ListingsSection({
           </div>
           <div className="text-center">
             <p className="text-slate-700 font-semibold text-[15px]">
-              {searchQuery
-                ? `No results for "${searchQuery}"`
-                : isRecipientUser
-                ? "No items available right now"
-                : isDonor && listings.length === 0
-                ? "No listings yet"
-                : "No listings match your filters"}
+              {searchQuery ? `No results for "${searchQuery}"` :
+              isRecipientUser ? "No items available right now" :
+              isDonor && listings.length === 0 ? "No listings yet" :
+              "No listings match your filters"}
             </p>
             <p className="text-slate-400 text-[13px] mt-1">
-              {searchQuery
-                ? "Try different keywords or clear the search"
-                : isRecipientUser
-                ? "Check back soon — new items are added regularly."
-                : isDonor && listings.length === 0
-                ? "Be the first to list a surplus item!"
-                : "Try adjusting your filters or region"}
+              {searchQuery ? "Try different keywords or clear the search" :
+              isRecipientUser ? "Check back soon — new items are added regularly." :
+              isDonor && listings.length === 0 ? "Be the first to list a surplus item!" :
+              "Try adjusting your filters or region"}
             </p>
             {!searchQuery && listings.length === 0 && isDonor && (
               <button
-                onClick={() =>
-                  document
-                    .getElementById("list")
-                    ?.scrollIntoView({ behavior: "smooth" })
-                }
-                className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]"
-              >
+                onClick={() => document.getElementById("list")?.scrollIntoView({ behavior: "smooth" })}
+                className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]">
                 List Your First Item →
               </button>
             )}
@@ -5202,23 +4751,15 @@ function ListingsSection({
                 All Available Surplus
               </h2>
               <p className="text-slate-500 text-[13px] mt-1">
-                {filtered.length} item{filtered.length !== 1 ? "s" : ""} across
-                all regions
-                {listings.filter((l) => {
+                {filtered.length} item{filtered.length !== 1 ? "s" : ""} across all regions
+                {listings.filter(l => {
                   const d = new Date(l.created_at);
                   const today = new Date();
                   return d.toDateString() === today.toDateString();
                 }).length > 0 && (
                   <span className="ml-2 inline-flex items-center gap-1 bg-green-100 text-green-700 text-[11px] font-semibold px-2 py-0.5 rounded-full">
                     <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                    {
-                      listings.filter(
-                        (l) =>
-                          new Date(l.created_at).toDateString() ===
-                          new Date().toDateString()
-                      ).length
-                    }{" "}
-                    added today
+                    {listings.filter(l => new Date(l.created_at).toDateString() === new Date().toDateString()).length} added today
                   </span>
                 )}
               </p>
@@ -5253,75 +4794,29 @@ function ListingsSection({
           {/* Full filter toolbar */}
           {/* Search */}
           <div className="relative mb-4">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-              <IconSearch />
-            </div>
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div>
             <input
               value={searchInput}
               onChange={(e) => {
                 setSearchInput(e.target.value);
                 clearTimeout(searchDebounce.current);
-                searchDebounce.current = setTimeout(
-                  () => setSearchQuery(e.target.value),
-                  300
-                );
+                searchDebounce.current = setTimeout(() => setSearchQuery(e.target.value), 300);
               }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  clearTimeout(searchDebounce.current);
-                  setSearchQuery(searchInput);
-                  e.target.blur();
-                }
-              }}
+              onKeyDown={(e) => { if (e.key === "Enter") { clearTimeout(searchDebounce.current); setSearchQuery(searchInput); e.target.blur(); }}}
               placeholder="Search by title, description, or organization…"
               className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 shadow-sm"
             />
-            {searchInput && (
-              <button
-                onClick={() => {
-                  setSearchInput("");
-                  setSearchQuery("");
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-              >
-                <IconX />
-              </button>
-            )}
+            {searchInput && <button onClick={() => { setSearchInput(""); setSearchQuery(""); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><IconX /></button>}
           </div>
           {/* Category pills with counts */}
-          <div
-            className="flex gap-2 mb-3 overflow-x-auto pb-2"
-            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
-          >
-            {["All", ...CATEGORIES].map((cat) => {
-              const count =
-                cat === "All"
-                  ? listings.length
-                  : listings.filter(
-                      (l) => l.category === cat && l.status === "available"
-                    ).length;
+          <div className="flex gap-2 mb-3 overflow-x-auto pb-2" style={{ scrollbarWidth:"none", msOverflowStyle:"none" }}>
+            {["All",...CATEGORIES].map(cat => {
+              const count = cat === "All" ? listings.length : listings.filter(l => l.category === cat && l.status === "available").length;
               return (
-                <button
-                  key={cat}
-                  onClick={() => setCatFilter(cat)}
-                  className={`text-[12px] font-medium px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap flex items-center gap-1.5 ${
-                    catFilter === cat
-                      ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"
-                  }`}
-                >
+                <button key={cat} onClick={() => setCatFilter(cat)}
+                  className={`text-[12px] font-medium px-3.5 py-1.5 rounded-full border transition-all whitespace-nowrap flex items-center gap-1.5 ${catFilter===cat ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-200" : "bg-white text-slate-600 border-slate-200 hover:border-blue-300"}`}>
                   {cat}
-                  {count > 0 && (
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                        catFilter === cat
-                          ? "bg-white/20 text-white"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  )}
+                  {count > 0 && <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${catFilter===cat ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>{count}</span>}
                 </button>
               );
             })}
@@ -5329,50 +4824,27 @@ function ListingsSection({
           {/* Region + Location */}
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
             <div className="flex items-center gap-2">
-              <span className="text-[12px] font-medium text-slate-500 shrink-0">
-                📍 Region:
-              </span>
-              <select
-                value={regionFilter}
-                onChange={(e) => setRegionFilter(e.target.value)}
-                className="text-[12px] font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              >
-                {REGIONS.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
+              <span className="text-[12px] font-medium text-slate-500 shrink-0">📍 Region:</span>
+              <select value={regionFilter} onChange={(e) => setRegionFilter(e.target.value)}
+                className="text-[12px] font-medium border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                {REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="flex items-center gap-2 flex-1">
-              <span className="text-[12px] font-medium text-slate-500 shrink-0">
-                🔍 Location:
-              </span>
-              <input
-                value={locationInput}
-                onChange={(e) => {
-                  setLocationInput(e.target.value);
-                  clearTimeout(locationDebounce.current);
-                  locationDebounce.current = setTimeout(
-                    () => setLocationSearch(e.target.value),
-                    300
-                  );
-                }}
+              <span className="text-[12px] font-medium text-slate-500 shrink-0">🔍 Location:</span>
+              <input value={locationInput}
+                onChange={(e) => { setLocationInput(e.target.value); clearTimeout(locationDebounce.current); locationDebounce.current = setTimeout(() => setLocationSearch(e.target.value), 300); }}
                 placeholder="Search city, zip, or area…"
-                className="flex-1 text-[12px] border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+                className="flex-1 text-[12px] border border-slate-200 rounded-xl px-3 py-2 bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400" />
             </div>
           </div>
 
           {/* Full scrolling card grid */}
-          <CardGrid
-            items={paginatedListings}
-            onCardClick={(l) => setSelectedListing(l)}
-          />
+          <CardGrid items={paginatedListings} onCardClick={(l) => setSelectedListing(l)} />
           {hasMore && (
             <div className="flex justify-center mt-8">
               <button
-                onClick={() => setVisibleCount((c) => c + 9)}
+                onClick={() => setVisibleCount(c => c + 9)}
                 className="flex items-center gap-2 bg-white border border-slate-200 hover:border-blue-300 text-slate-700 hover:text-blue-600 font-medium px-8 py-3 rounded-2xl transition-all shadow-sm hover:shadow-md"
               >
                 Load more ({filtered.length - visibleCount} remaining)
@@ -5454,18 +4926,13 @@ function ListingsSection({
 
         {/* Search bar on dashboard */}
         <div className="relative mb-6 mt-2">
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-            <IconSearch />
-          </div>
+          <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"><IconSearch /></div>
           <input
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
               clearTimeout(searchDebounce.current);
-              searchDebounce.current = setTimeout(
-                () => setSearchQuery(e.target.value),
-                300
-              );
+              searchDebounce.current = setTimeout(() => setSearchQuery(e.target.value), 300);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -5479,23 +4946,12 @@ function ListingsSection({
             className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 shadow-sm"
           />
           {searchInput && (
-            <button
-              onClick={() => {
-                setSearchInput("");
-                setSearchQuery("");
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-            >
-              <IconX />
-            </button>
+            <button onClick={() => { setSearchInput(""); setSearchQuery(""); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><IconX /></button>
           )}
         </div>
 
         {/* 3-card preview grid */}
-        <CardGrid
-          items={previewListings}
-          onCardClick={(l) => setSelectedListing(l)}
-        />
+        <CardGrid items={previewListings} onCardClick={(l) => setSelectedListing(l)} />
 
         {/* Explore Full Marketplace CTA */}
         {!loading && !error && listings.length > 0 && (
@@ -5720,10 +5176,7 @@ const EMPTY_FORM = {
 
 function FormSection({ onSuccess, user }) {
   // Recipients should never see the donate form
-  const isRecipient = [
-    "School/Non-Profit Recipient",
-    "Individual Recipient",
-  ].includes(user?.account_type);
+  const isRecipient = ["School/Non-Profit Recipient", "Individual Recipient"].includes(user?.account_type);
   if (isRecipient) return null;
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -5761,9 +5214,7 @@ function FormSection({ onSuccess, user }) {
       return;
     }
     if (form.category === "Medical Supplies" && (!medCheck1 || !medCheck2)) {
-      setError(
-        "For Medical Supplies, you must confirm both medical compliance checkboxes."
-      );
+      setError("For Medical Supplies, you must confirm both medical compliance checkboxes.");
       return;
     }
     const orgNeeded =
@@ -5819,12 +5270,7 @@ function FormSection({ onSuccess, user }) {
       if (onSuccess) onSuccess();
       else window.scrollTo({ top: 0, behavior: "smooth" });
       setTimeout(() => setSuccess(false), 5000);
-      if (typeof window !== "undefined")
-        window.dispatchEvent(
-          new CustomEvent("equilinkz:toast", {
-            detail: { message: "Listing published and live!", type: "success" },
-          })
-        );
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("equilinkz:toast", { detail: { message: "Listing published and live!", type: "success" } }));
     } catch (err) {
       setError(err.message || "Submission failed.");
     } finally {
@@ -6019,9 +5465,7 @@ function FormSection({ onSuccess, user }) {
                     className="mt-0.5 w-4 h-4 rounded border-teal-300 text-teal-600 focus:ring-teal-500 shrink-0"
                   />
                   <p className="text-[12px] text-teal-700 leading-relaxed">
-                    I confirm these items are{" "}
-                    <strong>unused, unexpired, and safe for transfer</strong> to
-                    another party.
+                    I confirm these items are <strong>unused, unexpired, and safe for transfer</strong> to another party.
                   </p>
                 </label>
                 <label className="flex items-start gap-3 cursor-pointer">
@@ -6032,12 +5476,7 @@ function FormSection({ onSuccess, user }) {
                     className="mt-0.5 w-4 h-4 rounded border-teal-300 text-teal-600 focus:ring-teal-500 shrink-0"
                   />
                   <p className="text-[12px] text-teal-700 leading-relaxed">
-                    I confirm I am{" "}
-                    <strong>
-                      not listing prescription medications, controlled
-                      substances, or sterile surgical equipment
-                    </strong>
-                    .
+                    I confirm I am <strong>not listing prescription medications, controlled substances, or sterile surgical equipment</strong>.
                   </p>
                 </label>
               </div>
@@ -6191,42 +5630,12 @@ function MissionSection() {
 // ─── Partners Section ─────────────────────────────────────────────────────────
 function PartnersSection() {
   const partners = [
-    {
-      name: "Velorix Technologies",
-      type: "Corporate Donor",
-      region: "North America",
-      logo: "VT",
-    },
-    {
-      name: "Kivara Education Hub",
-      type: "School District",
-      region: "East Africa",
-      logo: "KE",
-    },
-    {
-      name: "Solendra Foundation",
-      type: "Non-Profit",
-      region: "South Asia",
-      logo: "SF",
-    },
-    {
-      name: "Nuvex Research Group",
-      type: "Research Institution",
-      region: "Europe",
-      logo: "NR",
-    },
-    {
-      name: "Orinova Aid Network",
-      type: "Non-Profit",
-      region: "Middle East",
-      logo: "OA",
-    },
-    {
-      name: "Zeltara Industries",
-      type: "Corporate Donor",
-      region: "Asia Pacific",
-      logo: "ZI",
-    },
+    { name: "Velorix Technologies", type: "Corporate Donor",      region: "North America", logo: "VT" },
+    { name: "Kivara Education Hub", type: "School District",      region: "East Africa",   logo: "KE" },
+    { name: "Solendra Foundation",  type: "Non-Profit",           region: "South Asia",    logo: "SF" },
+    { name: "Nuvex Research Group", type: "Research Institution", region: "Europe",        logo: "NR" },
+    { name: "Orinova Aid Network",  type: "Non-Profit",           region: "Middle East",   logo: "OA" },
+    { name: "Zeltara Industries",   type: "Corporate Donor",      region: "Asia Pacific",  logo: "ZI" },
   ];
   return (
     <section id="partners" className="py-24 bg-slate-50">
@@ -6267,9 +5676,7 @@ function PartnersSection() {
                 </div>
               </div>
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-[12px] text-slate-500">
-                  Partner organization
-                </span>
+                <span className="text-[12px] text-slate-500">Partner organization</span>
                 <span className="text-[11px] font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
                   Active Partner
                 </span>
@@ -6277,6 +5684,7 @@ function PartnersSection() {
             </div>
           ))}
         </div>
+
       </div>
     </section>
   );
@@ -6298,37 +5706,15 @@ function ImpactSection() {
             Our Goals. Our Vision.
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto text-[15px] leading-relaxed">
-            These are the milestones Equilinkz is built to reach — every
-            transfer brings us closer to a world where technology access is
-            universal.
+            These are the milestones Equilinkz is built to reach — every transfer brings us closer to a world where technology access is universal.
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-16">
           {[
-            {
-              value: "12,400+",
-              label: "Items — Our Goal",
-              sub: "to redistribute globally",
-              color: "text-blue-600",
-            },
-            {
-              value: "340+",
-              label: "Organizations",
-              sub: "we aim to connect",
-              color: "text-green-600",
-            },
-            {
-              value: "98,000+",
-              label: "lbs E-Waste",
-              sub: "target to divert",
-              color: "text-amber-600",
-            },
-            {
-              value: "60+",
-              label: "Countries",
-              sub: "our platform supports",
-              color: "text-violet-600",
-            },
+            { value: "12,400+", label: "Items — Our Goal", sub: "to redistribute globally", color: "text-blue-600" },
+            { value: "340+",    label: "Organizations",    sub: "we aim to connect",     color: "text-green-600" },
+            { value: "98,000+", label: "lbs E-Waste",      sub: "target to divert",      color: "text-amber-600" },
+            { value: "60+",     label: "Countries",        sub: "our platform supports",  color: "text-violet-600" },
           ].map(({ value, label, sub, color }) => (
             <div
               key={label}
@@ -6345,9 +5731,7 @@ function ImpactSection() {
           ))}
         </div>
         <p className="text-center text-[11px] text-slate-400 mt-6 italic">
-          * These figures represent Equilinkz's platform goals and targets, not
-          verified historical data. We are committed to reaching these
-          milestones as our community grows.
+          * These figures represent Equilinkz's platform goals and targets, not verified historical data. We are committed to reaching these milestones as our community grows.
         </p>
       </div>
     </section>
@@ -6379,64 +5763,20 @@ function Footer({ onPrivacy }) {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-x-16 gap-y-3">
-            <a
-              href="#mission"
-              className="text-[13px] text-slate-400 hover:text-white transition-colors"
-            >
-              Mission
-            </a>
-            <a
-              href="#browse"
-              className="text-[13px] text-slate-400 hover:text-white transition-colors"
-            >
-              Browse Surplus
-            </a>
-            <a
-              href="#list"
-              className="text-[13px] text-slate-400 hover:text-white transition-colors"
-            >
-              List Resources
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-[13px] text-slate-400 hover:text-white transition-colors"
-            >
-              How It Works
-            </a>
-            <a
-              href="#impact"
-              className="text-[13px] text-slate-400 hover:text-white transition-colors"
-            >
-              Our Goals
-            </a>
-            <button
-              onClick={onPrivacy}
-              className="text-[13px] text-slate-400 hover:text-white transition-colors text-left"
-            >
-              Privacy Policy
-            </button>
-            <a
-              href="mailto:equilinkz@gmail.com"
-              className="text-[13px] text-slate-400 hover:text-white transition-colors"
-            >
-              Contact Us
-            </a>
+            <a href="#mission" className="text-[13px] text-slate-400 hover:text-white transition-colors">Mission</a>
+            <a href="#browse" className="text-[13px] text-slate-400 hover:text-white transition-colors">Browse Surplus</a>
+            <a href="#list" className="text-[13px] text-slate-400 hover:text-white transition-colors">List Resources</a>
+            <a href="#how-it-works" className="text-[13px] text-slate-400 hover:text-white transition-colors">How It Works</a>
+            <a href="#impact" className="text-[13px] text-slate-400 hover:text-white transition-colors">Our Goals</a>
+            <button onClick={onPrivacy} className="text-[13px] text-slate-400 hover:text-white transition-colors text-left">Privacy Policy</button>
+            <a href="mailto:equilinkz@gmail.com" className="text-[13px] text-slate-400 hover:text-white transition-colors">Contact Us</a>
           </div>
           <div className="mt-6 md:mt-0">
             <p className="text-[12px] text-slate-500 mb-2">Get in touch</p>
-            <a
-              href="mailto:equilinkz@gmail.com"
-              className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-[13px] font-medium"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-4 h-4"
-              >
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
+            <a href="mailto:equilinkz@gmail.com" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-[13px] font-medium">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
               </svg>
               equilinkz@gmail.com
             </a>
@@ -6457,14 +5797,7 @@ function Footer({ onPrivacy }) {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 // ─── Listing Detail Modal ────────────────────────────────────────────────────
-function ListingDetailModal({
-  listing,
-  user,
-  onClose,
-  onClaim,
-  onOpenChat,
-  onToast,
-}) {
+function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToast }) {
   const [imgIndex, setImgIndex] = useState(0);
   const [claiming, setClaiming] = useState(false);
 
@@ -6474,12 +5807,8 @@ function ListingDetailModal({
   let images = [];
   try {
     const parsed = JSON.parse(listing.image_url);
-    images = Array.isArray(parsed)
-      ? parsed
-      : [listing.image_url].filter(Boolean);
-  } catch {
-    images = listing.image_url ? [listing.image_url] : [];
-  }
+    images = Array.isArray(parsed) ? parsed : [listing.image_url].filter(Boolean);
+  } catch { images = listing.image_url ? [listing.image_url] : []; }
 
   const handleClaim = async () => {
     if (onClaim) {
@@ -6490,125 +5819,67 @@ function ListingDetailModal({
   };
 
   const handleWhatsApp = () => {
-    const text = encodeURIComponent(
-      `Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`
-    );
+    const text = encodeURIComponent(`Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`);
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(
-      `${window.location.origin}?listing=${listing.id}`
-    );
+    navigator.clipboard.writeText(`${window.location.origin}?listing=${listing.id}`);
     if (onToast) onToast("Link copied!", "success");
   };
 
   const CATEGORY_COLORS = {
-    Electronics: "bg-blue-50 text-blue-700 border-blue-100",
-    Furniture: "bg-amber-50 text-amber-700 border-amber-100",
+    "Electronics": "bg-blue-50 text-blue-700 border-blue-100",
+    "Furniture": "bg-amber-50 text-amber-700 border-amber-100",
     "Office Supplies": "bg-purple-50 text-purple-700 border-purple-100",
     "Medical Supplies": "bg-teal-50 text-teal-700 border-teal-100",
     "Food & Groceries": "bg-green-50 text-green-700 border-green-100",
-    Clothing: "bg-pink-50 text-pink-700 border-pink-100",
+    "Clothing": "bg-pink-50 text-pink-700 border-pink-100",
     "Books & Education": "bg-indigo-50 text-indigo-700 border-indigo-100",
-    Other: "bg-slate-50 text-slate-600 border-slate-100",
+    "Other": "bg-slate-50 text-slate-600 border-slate-100",
   };
-  const catStyle =
-    CATEGORY_COLORS[listing.category] || CATEGORY_COLORS["Other"];
-  const isDone =
-    listing.status === "claimed" || listing.status === "transferred";
+  const catStyle = CATEGORY_COLORS[listing.category] || CATEGORY_COLORS["Other"];
+  const isDone = listing.status === "claimed" || listing.status === "transferred";
   const isOwner = user && user.email === listing.owner_email;
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative bg-white w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Close button */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-9 h-9 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 shadow-sm transition-all"
-        >
+        <button onClick={onClose} className="absolute top-4 right-4 z-10 w-9 h-9 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 shadow-sm transition-all">
           <IconX />
         </button>
 
         {/* Image carousel */}
-        <div
-          className="relative w-full bg-slate-100 shrink-0"
-          style={{ height: "280px" }}
-        >
+        <div className="relative w-full bg-slate-100 shrink-0" style={{ height: "280px" }}>
           {images.length > 0 ? (
             <>
-              <img
-                src={images[imgIndex]}
-                alt={listing.title}
-                className="w-full h-full object-cover"
-              />
+              <img src={images[imgIndex]} alt={listing.title} className="w-full h-full object-cover" />
               {images.length > 1 && (
                 <>
-                  <button
-                    onClick={() =>
-                      setImgIndex(
-                        (i) => (i - 1 + images.length) % images.length
-                      )
-                    }
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="w-4 h-4"
-                    >
-                      <path
-                        d="M15 18l-6-6 6-6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                  <button onClick={() => setImgIndex(i => (i - 1 + images.length) % images.length)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
-                  <button
-                    onClick={() => setImgIndex((i) => (i + 1) % images.length)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      className="w-4 h-4"
-                    >
-                      <path
-                        d="M9 18l6-6-6-6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+                  <button onClick={() => setImgIndex(i => (i + 1) % images.length)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
                     {images.map((_, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setImgIndex(i)}
-                        className={`w-1.5 h-1.5 rounded-full transition-all ${
-                          i === imgIndex ? "bg-white w-4" : "bg-white/50"
-                        }`}
-                      />
+                      <button key={i} onClick={() => setImgIndex(i)}
+                        className={`w-1.5 h-1.5 rounded-full transition-all ${i === imgIndex ? "bg-white w-4" : "bg-white/50"}`} />
                     ))}
                   </div>
                 </>
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl">
-              📦
-            </div>
+            <div className="w-full h-full flex items-center justify-center text-6xl">📦</div>
           )}
         </div>
 
@@ -6616,57 +5887,24 @@ function ListingDetailModal({
         <div className="overflow-y-auto flex-1 p-6">
           {/* Category + status */}
           <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span
-              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${catStyle}`}
-            >
-              {listing.category}
-            </span>
-            {isDone && (
-              <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
-                {listing.status === "claimed" ? "Claimed" : "Transferred"}
-              </span>
-            )}
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${catStyle}`}>{listing.category}</span>
+            {isDone && <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">{listing.status === "claimed" ? "Claimed" : "Transferred"}</span>}
           </div>
 
           {/* Title */}
-          <h2 className="text-xl font-bold text-slate-900 mb-1 leading-tight">
-            {listing.title}
-          </h2>
+          <h2 className="text-xl font-bold text-slate-900 mb-1 leading-tight">{listing.title}</h2>
 
           {/* Meta */}
           <div className="flex flex-wrap gap-3 text-[12px] text-slate-500 mb-4">
-            {listing.location && (
-              <span className="flex items-center gap-1">
-                📍 {listing.location}
-              </span>
-            )}
-            {listing.quantity && (
-              <span className="flex items-center gap-1">
-                📦 Qty: {listing.quantity}
-              </span>
-            )}
-            {listing.condition && (
-              <span className="flex items-center gap-1">
-                ✅ {listing.condition}
-              </span>
-            )}
-            {listing.created_at && (
-              <span className="flex items-center gap-1">
-                🕐{" "}
-                {new Date(listing.created_at).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </span>
-            )}
+            {listing.location && <span className="flex items-center gap-1">📍 {listing.location}</span>}
+            {listing.quantity && <span className="flex items-center gap-1">📦 Qty: {listing.quantity}</span>}
+            {listing.condition && <span className="flex items-center gap-1">✅ {listing.condition}</span>}
+            {listing.created_at && <span className="flex items-center gap-1">🕐 {new Date(listing.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
           </div>
 
           {/* Description */}
           {listing.description && (
-            <p className="text-[14px] text-slate-600 leading-relaxed mb-5 whitespace-pre-wrap">
-              {listing.description}
-            </p>
+            <p className="text-[14px] text-slate-600 leading-relaxed mb-5 whitespace-pre-wrap">{listing.description}</p>
           )}
 
           {/* Divider */}
@@ -6680,38 +5918,15 @@ function ListingDetailModal({
                 disabled={claiming}
                 className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-3.5 rounded-2xl transition-all shadow-lg shadow-blue-200 text-[15px]"
               >
-                {claiming ? (
-                  <>
-                    <IconLoader /> Claiming…
-                  </>
-                ) : (
-                  <>
-                    <IconArrow /> Claim This Item
-                  </>
-                )}
+                {claiming ? <><IconLoader /> Claiming…</> : <><IconArrow /> Claim This Item</>}
               </button>
             )}
             {!isOwner && user && onOpenChat && listing.owner_email && (
               <button
-                onClick={() => {
-                  onOpenChat(listing);
-                  onClose();
-                }}
+                onClick={() => { onOpenChat(listing); onClose(); }}
                 className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-2xl transition-all text-[14px]"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="w-4 h-4"
-                >
-                  <path
-                    d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 Message Donor
               </button>
             )}
@@ -6720,37 +5935,14 @@ function ListingDetailModal({
                 onClick={handleWhatsApp}
                 className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 font-medium py-2.5 rounded-xl transition-all text-[13px] border border-green-100"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-4 h-4"
-                >
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                </svg>
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                 Share on WhatsApp
               </button>
               <button
                 onClick={handleCopyLink}
                 className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 font-medium py-2.5 rounded-xl transition-all text-[13px] border border-slate-200"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="w-4 h-4"
-                >
-                  <path
-                    d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 Copy Link
               </button>
             </div>
@@ -6760,6 +5952,7 @@ function ListingDetailModal({
     </div>
   );
 }
+
 
 // ─── Change Password Modal ────────────────────────────────────────────────────
 function ChangePasswordModal({ onClose }) {
@@ -6771,107 +5964,42 @@ function ChangePasswordModal({ onClose }) {
   const [success, setSuccess] = useState("");
 
   const handleSave = async () => {
-    setError("");
-    setSuccess("");
-    if (!next || next.length < 8) {
-      setError("New password must be at least 8 characters.");
-      return;
-    }
-    if (next !== confirm) {
-      setError("Passwords do not match.");
-      return;
-    }
+    setError(""); setSuccess("");
+    if (!next || next.length < 8) { setError("New password must be at least 8 characters."); return; }
+    if (next !== confirm) { setError("Passwords do not match."); return; }
     setSaving(true);
     try {
       const res = await fetch(`${AUTH_URL}/user`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ password: next }),
       });
-      if (!res.ok) {
-        const d = await res.json();
-        throw new Error(d.message || "Failed to update password.");
-      }
+      if (!res.ok) { const d = await res.json(); throw new Error(d.message || "Failed to update password."); }
       setSuccess("Password updated successfully!");
-      setCurrent("");
-      setNext("");
-      setConfirm("");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
+      setCurrent(""); setNext(""); setConfirm("");
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
   };
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"
-        >
-          <IconX />
-        </button>
-        <h3 className="text-[17px] font-bold text-slate-900 mb-5">
-          Change Password
-        </h3>
-        {error && (
-          <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">
-            {error}
-          </div>
-        )}
-        {success && (
-          <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-[13px] text-green-700">
-            {success}
-          </div>
-        )}
+        <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"><IconX /></button>
+        <h3 className="text-[17px] font-bold text-slate-900 mb-5">Change Password</h3>
+        {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">{error}</div>}
+        {success && <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-[13px] text-green-700">{success}</div>}
         <div className="space-y-4">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-              New Password
-            </label>
-            <input
-              type="password"
-              value={next}
-              onChange={(e) => setNext(e.target.value)}
-              placeholder="Min 8 characters"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">New Password</label>
+            <input type="password" value={next} onChange={e => setNext(e.target.value)} placeholder="Min 8 characters" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-              Confirm New Password
-            </label>
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              placeholder="Repeat new password"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-            />
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Confirm New Password</label>
+            <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat new password" className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
           </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]"
-          >
-            {saving ? (
-              <>
-                <IconLoader /> Saving…
-              </>
-            ) : (
-              <>
-                <IconCheck /> Update Password
-              </>
-            )}
+          <button onClick={handleSave} disabled={saving} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]">
+            {saving ? <><IconLoader /> Saving…</> : <><IconCheck /> Update Password</>}
           </button>
         </div>
       </div>
@@ -6881,171 +6009,33 @@ function ChangePasswordModal({ onClose }) {
 
 // ─── Full Facebook-Style Dashboard ───────────────────────────────────────────
 function Dashboard({
-  user,
-  dashView,
-  setDashView,
-  onSignOut,
-  unreadCount,
-  onOpenChat,
-  onOpenInbox,
-  refreshTrigger,
-  onRefresh,
-  allListings,
-  onListingsLoaded,
-  activeChatListing,
-  onClearActiveChat,
+  user, dashView, setDashView, onSignOut, unreadCount,
+  onOpenChat, onOpenInbox, refreshTrigger, onRefresh, allListings, onListingsLoaded,
+  activeChatListing, onClearActiveChat
 }) {
-  const isRecipient = [
-    "School/Non-Profit Recipient",
-    "Individual Recipient",
-  ].includes(user?.account_type);
-  const isDonor = ["Corporate/Lab Donor", "Individual Donor"].includes(
-    user?.account_type
-  );
-  const initials = (user?.username || user?.org_name || user?.email || "U")
-    .slice(0, 2)
-    .toUpperCase();
+  const isRecipient = ["School/Non-Profit Recipient", "Individual Recipient"].includes(user?.account_type);
+  const isDonor = ["Corporate/Lab Donor", "Individual Donor"].includes(user?.account_type);
+  const initials = (user?.username || user?.org_name || user?.email || "U").slice(0, 2).toUpperCase();
 
   const navItems = [
-    {
-      id: "feed",
-      label: "Home Feed",
-      icon: (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="w-5 h-5"
-        >
-          <path
-            d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <polyline
-            points="9 22 9 12 15 12 15 22"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-    ...(isDonor
-      ? [
-          {
-            id: "mylistings",
-            label: "My Listings",
-            icon: (
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-5 h-5"
-              >
-                <path
-                  d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <polyline
-                  points="14 2 14 8 20 8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ),
-          },
-        ]
-      : []),
-    ...(isRecipient
-      ? [
-          {
-            id: "claimed",
-            label: "Claimed Items",
-            icon: (
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                className="w-5 h-5"
-              >
-                <path
-                  d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            ),
-          },
-        ]
-      : []),
-    {
-      id: "messages",
-      label: "Messages",
-      icon: (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="w-5 h-5"
-        >
-          <path
-            d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      badge: unreadCount > 0 ? unreadCount : null,
-    },
-    {
-      id: "impact",
-      label: "My Impact",
-      icon: (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="w-5 h-5"
-        >
-          <polyline
-            points="22 12 18 12 15 21 9 3 6 12 2 12"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-    {
-      id: "settings",
-      label: "Settings",
-      icon: (
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="w-5 h-5"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
+    { id: "feed", label: "Home Feed", icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" strokeLinecap="round" strokeLinejoin="round"/><polyline points="9 22 9 12 15 12 15 22" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    )},
+    ...(isDonor ? [{ id: "mylistings", label: "My Listings", icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    )}] : []),
+    ...(isRecipient ? [{ id: "claimed", label: "Claimed Items", icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" strokeLinecap="round" strokeLinejoin="round"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    )}] : []),
+    { id: "messages", label: "Messages", icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    ), badge: unreadCount > 0 ? unreadCount : null },
+    { id: "impact", label: "My Impact", icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    )},
+    { id: "settings", label: "Settings", icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    )},
   ];
 
   return (
@@ -7054,12 +6044,8 @@ function Dashboard({
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 fixed top-0 left-0 h-full z-30 shadow-sm">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-slate-100">
-          <span className="text-[20px] font-black text-blue-600 tracking-tight">
-            Equilinkz
-          </span>
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            Bridging the resource gap
-          </p>
+          <span className="text-[20px] font-black text-blue-600 tracking-tight">Equilinkz</span>
+          <p className="text-[10px] text-slate-400 mt-0.5">Bridging the resource gap</p>
         </div>
 
         {/* User profile card */}
@@ -7069,19 +6055,15 @@ function Dashboard({
               {initials}
             </div>
             <div className="min-w-0">
-              <p className="text-[13px] font-bold text-slate-900 truncate">
-                {user?.username || user?.org_name || "User"}
-              </p>
-              <p className="text-[10px] text-slate-500 truncate">
-                {user?.account_type}
-              </p>
+              <p className="text-[13px] font-bold text-slate-900 truncate">{user?.username || user?.org_name || "User"}</p>
+              <p className="text-[10px] text-slate-500 truncate">{user?.account_type}</p>
             </div>
           </div>
         </div>
 
         {/* Nav links */}
         <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
-          {navItems.map((item) => (
+          {navItems.map(item => (
             <button
               key={item.id}
               onClick={() => setDashView(item.id)}
@@ -7094,9 +6076,7 @@ function Dashboard({
               {item.icon}
               {item.label}
               {item.badge && (
-                <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                  {item.badge}
-                </span>
+                <span className="ml-auto w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{item.badge}</span>
               )}
             </button>
           ))}
@@ -7109,15 +6089,7 @@ function Dashboard({
               onClick={() => setDashView("post")}
               className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-[13px] transition-all shadow-sm"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                className="w-4 h-4"
-              >
-                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-              </svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
               Post an Item
             </button>
           </div>
@@ -7129,25 +6101,7 @@ function Dashboard({
             onClick={onSignOut}
             className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-medium text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="w-4 h-4"
-            >
-              <path
-                d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <polyline
-                points="16 17 21 12 16 7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <line x1="21" y1="12" x2="9" y2="12" strokeLinecap="round" />
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" strokeLinecap="round" strokeLinejoin="round"/><polyline points="16 17 21 12 16 7" strokeLinecap="round" strokeLinejoin="round"/><line x1="21" y1="12" x2="9" y2="12" strokeLinecap="round"/></svg>
             Sign Out
           </button>
         </div>
@@ -7176,65 +6130,32 @@ function Dashboard({
 
       {/* ── MOBILE BOTTOM NAV ── */}
       <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-1 py-1 shadow-lg">
-        {navItems
-          .filter((n) =>
-            ["feed", "mylistings", "claimed", "messages", "settings"].includes(
-              n.id
-            )
-          )
-          .slice(0, 5)
-          .map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setDashView(item.id)}
-              className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
-                dashView === item.id
-                  ? "text-blue-600"
-                  : "text-slate-400 hover:text-slate-700"
-              }`}
-            >
-              {item.icon}
-              <span className="text-[9px] font-medium">
-                {item.label.split(" ")[0]}
-              </span>
-              {item.badge && (
-                <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">
-                  {item.badge}
-                </span>
-              )}
-            </button>
-          ))}
+        {navItems.filter(n => ["feed","mylistings","claimed","messages","settings"].includes(n.id)).slice(0,5).map(item => (
+          <button
+            key={item.id}
+            onClick={() => setDashView(item.id)}
+            className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
+              dashView === item.id ? "text-blue-600" : "text-slate-400 hover:text-slate-700"
+            }`}
+          >
+            {item.icon}
+            <span className="text-[9px] font-medium">{item.label.split(" ")[0]}</span>
+            {item.badge && <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{item.badge}</span>}
+          </button>
+        ))}
       </div>
     </div>
   );
 }
 
 // ─── Dashboard Content Router ─────────────────────────────────────────────────
-function DashboardContent({
-  view,
-  setView,
-  user,
-  isRecipient,
-  isDonor,
-  onOpenChat,
-  onOpenInbox,
-  refreshTrigger,
-  onRefresh,
-  allListings,
-  onListingsLoaded,
-  unreadCount,
-  onSignOut,
-  activeChatListing,
-  onClearActiveChat,
-}) {
+function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenChat, onOpenInbox, refreshTrigger, onRefresh, allListings, onListingsLoaded, unreadCount, onSignOut, activeChatListing, onClearActiveChat }) {
   const [myListings, setMyListings] = useState([]);
   const [claimedItems, setClaimedItems] = useState([]);
   const [loadingMine, setLoadingMine] = useState(false);
   const [loadingClaimed, setLoadingClaimed] = useState(false);
   const [showChangePwd, setShowChangePwd] = useState(false);
-  const [settingsUsername, setSettingsUsername] = useState(
-    user?.username || ""
-  );
+  const [settingsUsername, setSettingsUsername] = useState(user?.username || "");
   const [settingsOrgName, setSettingsOrgName] = useState(user?.org_name || "");
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState("");
@@ -7246,13 +6167,11 @@ function DashboardContent({
     if (view !== "mylistings" || !user) return;
     setLoadingMine(true);
     fetch(
-      `${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(
-        user.email
-      )}&order=created_at.desc&select=*`,
+      `${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(user.email)}&order=created_at.desc&select=*`,
       { headers: getHeaders(getToken()) }
     )
-      .then((r) => r.json())
-      .then((d) => setMyListings(Array.isArray(d) ? d : []))
+      .then(r => r.json())
+      .then(d => setMyListings(Array.isArray(d) ? d : []))
       .catch(() => setMyListings([]))
       .finally(() => setLoadingMine(false));
   }, [view, user, refreshTrigger]);
@@ -7262,54 +6181,30 @@ function DashboardContent({
     if (view !== "claimed" || !user) return;
     setLoadingClaimed(true);
     fetch(
-      `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(
-        user.email
-      )}&order=created_at.desc&select=*`,
+      `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(user.email)}&order=created_at.desc&select=*`,
       { headers: getHeaders(getToken()) }
     )
-      .then((r) => r.json())
-      .then((d) => setClaimedItems(Array.isArray(d) ? d : []))
+      .then(r => r.json())
+      .then(d => setClaimedItems(Array.isArray(d) ? d : []))
       .catch(() => setClaimedItems([]))
       .finally(() => setLoadingClaimed(false));
   }, [view, user, refreshTrigger]);
 
   const saveSettings = async () => {
-    if (!settingsUsername.trim()) {
-      setSettingsError("Username cannot be empty.");
-      return;
-    }
-    setSettingsSaving(true);
-    setSettingsError("");
-    setSettingsSuccess("");
+    if (!settingsUsername.trim()) { setSettingsError("Username cannot be empty."); return; }
+    setSettingsSaving(true); setSettingsError(""); setSettingsSuccess("");
     try {
       const res = await fetch(`${AUTH_URL}/user`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${getToken()}`,
-        },
-        body: JSON.stringify({
-          data: {
-            ...user,
-            username: settingsUsername.trim(),
-            org_name: settingsOrgName.trim(),
-          },
-        }),
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ data: { ...user, username: settingsUsername.trim(), org_name: settingsOrgName.trim() } }),
       });
       if (!res.ok) throw new Error("Failed to save.");
-      const updated = {
-        ...user,
-        username: settingsUsername.trim(),
-        org_name: settingsOrgName.trim(),
-      };
+      const updated = { ...user, username: settingsUsername.trim(), org_name: settingsOrgName.trim() };
       localStorage.setItem("eq_user", JSON.stringify(updated));
       setSettingsSuccess("Profile saved!");
-    } catch (err) {
-      setSettingsError(err.message);
-    } finally {
-      setSettingsSaving(false);
-    }
+    } catch (err) { setSettingsError(err.message); }
+    finally { setSettingsSaving(false); }
   };
 
   const STATUS_BADGE = {
@@ -7318,12 +6213,7 @@ function DashboardContent({
     claimed: "bg-amber-100 text-amber-700",
     transferred: "bg-slate-100 text-slate-500",
   };
-  const STATUS_LABEL = {
-    available: "Available",
-    pending: "Claimed",
-    claimed: "Claimed",
-    transferred: "Transferred",
-  };
+  const STATUS_LABEL = { available: "Available", pending: "Claimed", claimed: "Claimed", transferred: "Transferred" };
 
   // ── FEED ──
   if (view === "feed" || view === "post") {
@@ -7336,9 +6226,7 @@ function DashboardContent({
               {view === "post" ? "Post an Item" : "Browse Listings"}
             </h1>
             <p className="text-[13px] text-slate-500 mt-0.5">
-              {view === "post"
-                ? "List your surplus for those who need it"
-                : "Available items from donors worldwide"}
+              {view === "post" ? "List your surplus for those who need it" : "Available items from donors worldwide"}
             </p>
           </div>
           {isDonor && view === "feed" && (
@@ -7346,27 +6234,13 @@ function DashboardContent({
               onClick={() => setView("post")}
               className="hidden md:flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-xl text-[13px] transition-all shadow-sm"
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                className="w-4 h-4"
-              >
-                <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-              </svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
               Post Item
             </button>
           )}
         </div>
         {view === "post" && isDonor ? (
-          <FormSectionInline
-            onSuccess={() => {
-              onRefresh();
-              setView("mylistings");
-            }}
-            user={user}
-          />
+          <FormSectionInline onSuccess={() => { onRefresh(); setView("mylistings"); }} user={user} />
         ) : (
           <ListingsSection
             refreshTrigger={refreshTrigger}
@@ -7386,103 +6260,47 @@ function DashboardContent({
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-[22px] font-bold text-slate-900">
-              My Listings
-            </h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
-              Items you have posted
-            </p>
+            <h1 className="text-[22px] font-bold text-slate-900">My Listings</h1>
+            <p className="text-[13px] text-slate-500 mt-0.5">Items you have posted</p>
           </div>
           <button
             onClick={() => setView("post")}
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-xl text-[13px] transition-all shadow-sm"
           >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="w-4 h-4"
-            >
-              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M12 5v14M5 12h14" strokeLinecap="round"/></svg>
             Post New
           </button>
         </div>
         {loadingMine ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl h-32 animate-pulse border border-slate-100"
-              />
-            ))}
+            {[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl h-32 animate-pulse border border-slate-100" />)}
           </div>
         ) : myListings.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-4">📦</div>
-            <h3 className="text-[16px] font-bold text-slate-700 mb-2">
-              No listings yet
-            </h3>
-            <p className="text-[13px] text-slate-500 mb-6">
-              Post your first surplus item and make an impact.
-            </p>
-            <button
-              onClick={() => setView("post")}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all"
-            >
-              Post an Item
-            </button>
+            <h3 className="text-[16px] font-bold text-slate-700 mb-2">No listings yet</h3>
+            <p className="text-[13px] text-slate-500 mb-6">Post your first surplus item and make an impact.</p>
+            <button onClick={() => setView("post")} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all">Post an Item</button>
           </div>
         ) : (
           <div className="space-y-3">
-            {myListings.map((l) => {
+            {myListings.map(l => {
               let img = null;
-              try {
-                const p = JSON.parse(l.image_url);
-                img = Array.isArray(p) ? p[0] : l.image_url;
-              } catch {
-                img = l.image_url;
-              }
+              try { const p = JSON.parse(l.image_url); img = Array.isArray(p) ? p[0] : l.image_url; } catch { img = l.image_url; }
               return (
-                <div
-                  key={l.id}
-                  className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all"
-                >
+                <div key={l.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
                   <div className="w-14 h-14 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                    {img ? (
-                      <img
-                        src={img}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl">
-                        📦
-                      </div>
-                    )}
+                    {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-semibold text-slate-900 truncate">
-                      {l.title}
-                    </p>
-                    <p className="text-[12px] text-slate-500 mt-0.5">
-                      {l.category} · {timeAgo(l.created_at)}
-                    </p>
+                    <p className="text-[14px] font-semibold text-slate-900 truncate">{l.title}</p>
+                    <p className="text-[12px] text-slate-500 mt-0.5">{l.category} · {timeAgo(l.created_at)}</p>
                   </div>
                   <div className="shrink-0 flex items-center gap-2">
-                    <span
-                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                        STATUS_BADGE[l.status] || "bg-slate-100 text-slate-500"
-                      }`}
-                    >
+                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_BADGE[l.status] || "bg-slate-100 text-slate-500"}`}>
                       {STATUS_LABEL[l.status] || l.status}
                     </span>
-                    {l.quantity && (
-                      <span className="text-[11px] text-slate-400">
-                        Qty: {l.quantity}
-                      </span>
-                    )}
+                    {l.quantity && <span className="text-[11px] text-slate-400">Qty: {l.quantity}</span>}
                   </div>
                 </div>
               );
@@ -7498,133 +6316,55 @@ function DashboardContent({
     return (
       <div className="max-w-4xl mx-auto px-4 py-6">
         <div className="mb-6">
-          <h1 className="text-[22px] font-bold text-slate-900">
-            Claimed Items
-          </h1>
-          <p className="text-[13px] text-slate-500 mt-0.5">
-            Items you have claimed — show your PIN at pickup
-          </p>
+          <h1 className="text-[22px] font-bold text-slate-900">Claimed Items</h1>
+          <p className="text-[13px] text-slate-500 mt-0.5">Items you have claimed — show your PIN at pickup</p>
         </div>
         {loadingClaimed ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="bg-white rounded-2xl h-24 animate-pulse border border-slate-100"
-              />
-            ))}
-          </div>
+          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl h-24 animate-pulse border border-slate-100" />)}</div>
         ) : claimedItems.length === 0 ? (
           <div className="text-center py-20">
             <div className="text-5xl mb-4">🎁</div>
-            <h3 className="text-[16px] font-bold text-slate-700 mb-2">
-              No claimed items yet
-            </h3>
-            <p className="text-[13px] text-slate-500 mb-6">
-              Browse listings and claim what you need.
-            </p>
-            <button
-              onClick={() => setView("feed")}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all"
-            >
-              Browse Listings
-            </button>
+            <h3 className="text-[16px] font-bold text-slate-700 mb-2">No claimed items yet</h3>
+            <p className="text-[13px] text-slate-500 mb-6">Browse listings and claim what you need.</p>
+            <button onClick={() => setView("feed")} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all">Browse Listings</button>
           </div>
         ) : (
           <div className="space-y-4">
-            {claimedItems.map((l) => {
+            {claimedItems.map(l => {
               let img = null;
-              try {
-                const p = JSON.parse(l.image_url);
-                img = Array.isArray(p) ? p[0] : l.image_url;
-              } catch {
-                img = l.image_url;
-              }
+              try { const p = JSON.parse(l.image_url); img = Array.isArray(p) ? p[0] : l.image_url; } catch { img = l.image_url; }
               return (
-                <div
-                  key={l.id}
-                  className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm"
-                >
+                <div key={l.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
                   <div className="flex items-start gap-4">
                     <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                      {img ? (
-                        <img
-                          src={img}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-2xl">
-                          📦
-                        </div>
-                      )}
+                      {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <p className="text-[15px] font-bold text-slate-900">
-                          {l.title}
-                        </p>
-                        <span
-                          className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${
-                            STATUS_BADGE[l.status] ||
-                            "bg-slate-100 text-slate-500"
-                          }`}
-                        >
+                        <p className="text-[15px] font-bold text-slate-900">{l.title}</p>
+                        <span className={`shrink-0 text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_BADGE[l.status] || "bg-slate-100 text-slate-500"}`}>
                           {STATUS_LABEL[l.status] || l.status}
                         </span>
                       </div>
-                      <p className="text-[12px] text-slate-500 mt-0.5">
-                        {l.category} · {l.location} · {timeAgo(l.created_at)}
-                      </p>
-                      {l.owner_org_name && (
-                        <p className="text-[12px] text-slate-500 mt-0.5">
-                          From: {l.owner_org_name}
-                        </p>
-                      )}
+                      <p className="text-[12px] text-slate-500 mt-0.5">{l.category} · {l.location} · {timeAgo(l.created_at)}</p>
+                      {l.owner_org_name && <p className="text-[12px] text-slate-500 mt-0.5">From: {l.owner_org_name}</p>}
                     </div>
                   </div>
                   {/* PIN display — only for this user's claimed item */}
                   {l.verification_pin && (
                     <div className="mt-4 bg-blue-50 border border-blue-200 rounded-2xl p-4">
-                      <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">
-                        Your Pickup PIN
-                      </p>
+                      <p className="text-[11px] font-semibold text-blue-600 uppercase tracking-wide mb-2">Your Pickup PIN</p>
                       <div className="flex items-center gap-3">
-                        <span className="text-[32px] font-black text-blue-700 tracking-widest">
-                          {l.verification_pin}
-                        </span>
+                        <span className="text-[32px] font-black text-blue-700 tracking-widest">{l.verification_pin}</span>
                         <button
-                          onClick={() =>
-                            navigator.clipboard.writeText(
-                              String(l.verification_pin)
-                            )
-                          }
+                          onClick={() => navigator.clipboard.writeText(String(l.verification_pin))}
                           className="flex items-center gap-1.5 text-[12px] font-medium text-blue-600 hover:text-blue-800 bg-white border border-blue-200 px-3 py-1.5 rounded-lg transition-all"
                         >
-                          <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            className="w-3.5 h-3.5"
-                          >
-                            <rect
-                              x="9"
-                              y="9"
-                              width="13"
-                              height="13"
-                              rx="2"
-                              ry="2"
-                            />
-                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                          </svg>
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                           Copy
                         </button>
                       </div>
-                      <p className="text-[11px] text-blue-500 mt-2">
-                        Show this PIN to the donor at pickup to complete the
-                        transfer.
-                      </p>
+                      <p className="text-[11px] text-blue-500 mt-2">Show this PIN to the donor at pickup to complete the transfer.</p>
                     </div>
                   )}
                 </div>
@@ -7655,74 +6395,41 @@ function DashboardContent({
 
   // ── IMPACT ──
   if (view === "impact") {
-    const myDonated = allListings.filter(
-      (l) => l.owner_email === user?.email
-    ).length;
-    const myTransferred = allListings.filter(
-      (l) => l.owner_email === user?.email && l.status === "transferred"
-    ).length;
+    const myDonated = allListings.filter(l => l.owner_email === user?.email).length;
+    const myTransferred = allListings.filter(l => l.owner_email === user?.email && l.status === "transferred").length;
     const myClaimed = claimedItems.length;
     return (
       <div className="max-w-4xl mx-auto px-4 py-6">
         <h1 className="text-[22px] font-bold text-slate-900 mb-2">My Impact</h1>
-        <p className="text-[13px] text-slate-500 mb-8">
-          Your contribution to bridging the resource gap.
-        </p>
+        <p className="text-[13px] text-slate-500 mb-8">Your contribution to bridging the resource gap.</p>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-          {isDonor && (
-            <>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-blue-600">
-                  {myDonated}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Items Posted
-                </p>
-              </div>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-green-600">
-                  {myTransferred}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Transferred
-                </p>
-              </div>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-amber-500">
-                  {myDonated - myTransferred > 0
-                    ? myDonated - myTransferred
-                    : 0}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Still Available
-                </p>
-              </div>
-            </>
-          )}
-          {isRecipient && (
-            <>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-blue-600">
-                  {myClaimed}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Items Claimed
-                </p>
-              </div>
-            </>
-          )}
+          {isDonor && <>
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+              <p className="text-[36px] font-black text-blue-600">{myDonated}</p>
+              <p className="text-[12px] font-semibold text-slate-600 mt-1">Items Posted</p>
+            </div>
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+              <p className="text-[36px] font-black text-green-600">{myTransferred}</p>
+              <p className="text-[12px] font-semibold text-slate-600 mt-1">Transferred</p>
+            </div>
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+              <p className="text-[36px] font-black text-amber-500">{myDonated - myTransferred > 0 ? myDonated - myTransferred : 0}</p>
+              <p className="text-[12px] font-semibold text-slate-600 mt-1">Still Available</p>
+            </div>
+          </>}
+          {isRecipient && <>
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+              <p className="text-[36px] font-black text-blue-600">{myClaimed}</p>
+              <p className="text-[12px] font-semibold text-slate-600 mt-1">Items Claimed</p>
+            </div>
+          </>}
         </div>
         {isDonor && myTransferred >= 3 && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4">
             <span className="text-3xl">🏆</span>
             <div>
-              <p className="text-[14px] font-bold text-blue-800">
-                Trusted Donor Badge
-              </p>
-              <p className="text-[12px] text-blue-600">
-                You have completed {myTransferred} verified transfers. Thank
-                you!
-              </p>
+              <p className="text-[14px] font-bold text-blue-800">Trusted Donor Badge</p>
+              <p className="text-[12px] text-blue-600">You have completed {myTransferred} verified transfers. Thank you!</p>
             </div>
           </div>
         )}
@@ -7735,137 +6442,56 @@ function DashboardContent({
     return (
       <div className="max-w-xl mx-auto px-4 py-6">
         <h1 className="text-[22px] font-bold text-slate-900 mb-6">Settings</h1>
-        {showChangePwd && (
-          <ChangePasswordModal onClose={() => setShowChangePwd(false)} />
-        )}
+        {showChangePwd && <ChangePasswordModal onClose={() => setShowChangePwd(false)} />}
 
         {/* Profile */}
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-4">
           <h2 className="text-[15px] font-bold text-slate-800 mb-4">Profile</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                Display Name
-              </label>
-              <input
-                value={settingsUsername}
-                onChange={(e) => setSettingsUsername(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              />
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Display Name</label>
+              <input value={settingsUsername} onChange={e => setSettingsUsername(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
             </div>
-            {["Corporate/Lab Donor", "School/Non-Profit Recipient"].includes(
-              user?.account_type
-            ) && (
+            {["Corporate/Lab Donor","School/Non-Profit Recipient"].includes(user?.account_type) && (
               <div>
-                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
-                  Organisation Name
-                </label>
-                <input
-                  value={settingsOrgName}
-                  onChange={(e) => setSettingsOrgName(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Organisation Name</label>
+                <input value={settingsOrgName} onChange={e => setSettingsOrgName(e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
               </div>
             )}
             <div className="bg-slate-50 rounded-xl p-4 space-y-1.5 text-[12px]">
-              <p>
-                <span className="font-semibold text-slate-700">Email:</span>{" "}
-                <span className="text-slate-500">{user?.email}</span>
-              </p>
-              <p>
-                <span className="font-semibold text-slate-700">
-                  Account type:
-                </span>{" "}
-                <span className="text-slate-500">{user?.account_type}</span>
-              </p>
-              <p>
-                <span className="font-semibold text-slate-700">Region:</span>{" "}
-                <span className="text-slate-500">
-                  {user?.region || "Not set"}
-                </span>
-              </p>
+              <p><span className="font-semibold text-slate-700">Email:</span> <span className="text-slate-500">{user?.email}</span></p>
+              <p><span className="font-semibold text-slate-700">Account type:</span> <span className="text-slate-500">{user?.account_type}</span></p>
+              <p><span className="font-semibold text-slate-700">Region:</span> <span className="text-slate-500">{user?.region || "Not set"}</span></p>
             </div>
-            {settingsError && (
-              <p className="text-[12px] text-red-500">{settingsError}</p>
-            )}
-            {settingsSuccess && (
-              <p className="text-[12px] text-green-600">{settingsSuccess}</p>
-            )}
-            <button
-              onClick={saveSettings}
-              disabled={settingsSaving}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]"
-            >
-              {settingsSaving ? (
-                <>
-                  <IconLoader /> Saving…
-                </>
-              ) : (
-                <>
-                  <IconCheck /> Save Changes
-                </>
-              )}
+            {settingsError && <p className="text-[12px] text-red-500">{settingsError}</p>}
+            {settingsSuccess && <p className="text-[12px] text-green-600">{settingsSuccess}</p>}
+            <button onClick={saveSettings} disabled={settingsSaving} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all text-[14px]">
+              {settingsSaving ? <><IconLoader /> Saving…</> : <><IconCheck /> Save Changes</>}
             </button>
           </div>
         </div>
 
         {/* Security */}
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-4">
-          <h2 className="text-[15px] font-bold text-slate-800 mb-4">
-            Security
-          </h2>
-          <button
-            onClick={() => setShowChangePwd(true)}
-            className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl text-[13px] font-medium text-slate-700 hover:text-blue-700 transition-all"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className="w-4 h-4"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round" />
-            </svg>
+          <h2 className="text-[15px] font-bold text-slate-800 mb-4">Security</h2>
+          <button onClick={() => setShowChangePwd(true)} className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl text-[13px] font-medium text-slate-700 hover:text-blue-700 transition-all">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round"/></svg>
             Change Password
           </button>
         </div>
 
         {/* Danger zone */}
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
-          <h2 className="text-[15px] font-bold text-red-800 mb-2">
-            Danger Zone
-          </h2>
-          <p className="text-[12px] text-red-600 mb-4 leading-relaxed">
-            Permanently delete your account and all your listings. This cannot
-            be undone.
-          </p>
+          <h2 className="text-[15px] font-bold text-red-800 mb-2">Danger Zone</h2>
+          <p className="text-[12px] text-red-600 mb-4 leading-relaxed">Permanently delete your account and all your listings. This cannot be undone.</p>
           {!confirmDelete ? (
-            <button
-              onClick={() => setConfirmDelete(true)}
-              className="w-full py-2.5 text-[13px] font-semibold text-red-600 border border-red-300 hover:bg-red-100 rounded-xl transition-all"
-            >
-              Delete My Account
-            </button>
+            <button onClick={() => setConfirmDelete(true)} className="w-full py-2.5 text-[13px] font-semibold text-red-600 border border-red-300 hover:bg-red-100 rounded-xl transition-all">Delete My Account</button>
           ) : (
             <div className="space-y-2">
-              <p className="text-[12px] text-red-700 font-semibold text-center">
-                Are you absolutely sure?
-              </p>
+              <p className="text-[12px] text-red-700 font-semibold text-center">Are you absolutely sure?</p>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="flex-1 py-2.5 text-[13px] font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={onSignOut}
-                  className="flex-1 py-2.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all"
-                >
-                  Yes, Delete
-                </button>
+                <button onClick={() => setConfirmDelete(false)} className="flex-1 py-2.5 text-[13px] font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all">Cancel</button>
+                <button onClick={onSignOut} className="flex-1 py-2.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all">Yes, Delete</button>
               </div>
             </div>
           )}
@@ -7902,23 +6528,21 @@ function LandingListingPreview({ onAuth }) {
           const data = await res.json();
           setListings(Array.isArray(data) ? data.slice(0, 3) : []);
         }
-      } catch {
-      } finally {
-        setLoading(false);
-      }
+      } catch {}
+      finally { setLoading(false); }
     };
     fetchPreview();
   }, []);
 
   const CATEGORY_COLORS_PREVIEW = {
-    Electronics: "bg-blue-50 text-blue-700",
-    Furniture: "bg-amber-50 text-amber-700",
+    "Electronics": "bg-blue-50 text-blue-700",
+    "Furniture": "bg-amber-50 text-amber-700",
     "Office Supplies": "bg-purple-50 text-purple-700",
     "Medical Supplies": "bg-teal-50 text-teal-700",
     "Food & Groceries": "bg-green-50 text-green-700",
-    Clothing: "bg-pink-50 text-pink-700",
+    "Clothing": "bg-pink-50 text-pink-700",
     "Books & Education": "bg-indigo-50 text-indigo-700",
-    Other: "bg-slate-50 text-slate-700",
+    "Other": "bg-slate-50 text-slate-700",
   };
 
   const placeholders = [1, 2, 3];
@@ -7929,16 +6553,13 @@ function LandingListingPreview({ onAuth }) {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-4 py-1.5 mb-6">
             <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-            <span className="text-[12px] font-semibold text-green-700 tracking-widest uppercase">
-              Live right now
-            </span>
+            <span className="text-[12px] font-semibold text-green-700 tracking-widest uppercase">Live right now</span>
           </div>
           <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">
             Items waiting to be claimed.
           </h2>
           <p className="text-slate-500 text-[15px] max-w-md mx-auto leading-relaxed">
-            Real surplus from real organizations — sign in to see everything and
-            claim what you need.
+            Real surplus from real organizations — sign in to see everything and claim what you need.
           </p>
         </div>
 
@@ -7947,10 +6568,7 @@ function LandingListingPreview({ onAuth }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {loading
               ? placeholders.map((i) => (
-                  <div
-                    key={i}
-                    className="bg-white border border-slate-100 rounded-2xl overflow-hidden animate-pulse"
-                  >
+                  <div key={i} className="bg-white border border-slate-100 rounded-2xl overflow-hidden animate-pulse">
                     <div className="w-full h-44 bg-slate-100" />
                     <div className="p-5 space-y-3">
                       <div className="h-4 bg-slate-100 rounded-full w-3/4" />
@@ -7959,91 +6577,45 @@ function LandingListingPreview({ onAuth }) {
                     </div>
                   </div>
                 ))
-              : (listings.length > 0
-                  ? listings
-                  : placeholders.map((_, i) => ({
-                      id: i,
-                      title: "Available Item",
-                      category: "Other",
-                      location: "Global",
-                      image_url: null,
-                      status: "available",
-                    }))
-                ).map((listing, i) => {
-                  const catStyle =
-                    CATEGORY_COLORS_PREVIEW[listing.category] ||
-                    CATEGORY_COLORS_PREVIEW["Other"];
-                  let imgUrl = null;
-                  try {
-                    const parsed = JSON.parse(listing.image_url);
-                    imgUrl = Array.isArray(parsed)
-                      ? parsed[0]
-                      : listing.image_url;
-                  } catch {
-                    imgUrl = listing.image_url;
-                  }
-                  return (
-                    <div
-                      key={listing.id || i}
-                      className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm select-none"
-                    >
-                      {/* Image area */}
-                      <div className="relative w-full h-44 bg-slate-100 overflow-hidden">
-                        {imgUrl ? (
-                          <img
-                            src={imgUrl}
-                            alt=""
-                            className="w-full h-full object-cover blur-sm scale-110"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-4xl bg-slate-100">
-                            📦
-                          </div>
-                        )}
-                        {/* Lock overlay */}
-                        <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center">
-                          <div className="flex flex-col items-center gap-1">
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              className="w-6 h-6 text-slate-400"
-                            >
-                              <rect
-                                x="3"
-                                y="11"
-                                width="18"
-                                height="11"
-                                rx="2"
-                                ry="2"
-                              />
-                              <path
-                                d="M7 11V7a5 5 0 0110 0v4"
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                            <span className="text-[11px] font-semibold text-slate-500">
-                              Sign in to view
-                            </span>
-                          </div>
+              : (listings.length > 0 ? listings : placeholders.map((_, i) => ({
+                  id: i, title: "Available Item", category: "Other", location: "Global", image_url: null, status: "available"
+                }))).map((listing, i) => {
+                const catStyle = CATEGORY_COLORS_PREVIEW[listing.category] || CATEGORY_COLORS_PREVIEW["Other"];
+                let imgUrl = null;
+                try {
+                  const parsed = JSON.parse(listing.image_url);
+                  imgUrl = Array.isArray(parsed) ? parsed[0] : listing.image_url;
+                } catch { imgUrl = listing.image_url; }
+                return (
+                  <div key={listing.id || i} className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm select-none">
+                    {/* Image area */}
+                    <div className="relative w-full h-44 bg-slate-100 overflow-hidden">
+                      {imgUrl ? (
+                        <img src={imgUrl} alt="" className="w-full h-full object-cover blur-sm scale-110" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-4xl bg-slate-100">📦</div>
+                      )}
+                      {/* Lock overlay */}
+                      <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 text-slate-400">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round"/>
+                          </svg>
+                          <span className="text-[11px] font-semibold text-slate-500">Sign in to view</span>
                         </div>
-                      </div>
-                      <div className="p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span
-                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${catStyle}`}
-                          >
-                            {listing.category}
-                          </span>
-                        </div>
-                        {/* Blurred title */}
-                        <div className="h-4 bg-slate-200 rounded-full w-3/4 mb-1.5 blur-[3px]" />
-                        <div className="h-3 bg-slate-100 rounded-full w-1/2 blur-[3px]" />
                       </div>
                     </div>
-                  );
-                })}
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${catStyle}`}>{listing.category}</span>
+                      </div>
+                      {/* Blurred title */}
+                      <div className="h-4 bg-slate-200 rounded-full w-3/4 mb-1.5 blur-[3px]" />
+                      <div className="h-3 bg-slate-100 rounded-full w-1/2 blur-[3px]" />
+                    </div>
+                  </div>
+                );
+              })}
           </div>
 
           {/* Fade + CTA overlay at bottom */}
@@ -8057,39 +6629,12 @@ function LandingListingPreview({ onAuth }) {
             className="group flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold px-10 py-4 rounded-2xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-1 text-[16px]"
           >
             Join free and browse everything
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="w-4 h-4 group-hover:translate-x-1 transition-transform"
-            >
-              <path
-                d="M5 12h14M12 5l7 7-7 7"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 group-hover:translate-x-1 transition-transform"><path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </button>
           <div className="flex items-center gap-4 text-[12px] text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">
-                ✓
-              </span>{" "}
-              Free forever
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">
-                ✓
-              </span>{" "}
-              No credit card
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">
-                ✓
-              </span>{" "}
-              Verified listings
-            </span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">✓</span> Free forever</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">✓</span> No credit card</span>
+            <span className="flex items-center gap-1.5"><span className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-[9px]">✓</span> Verified listings</span>
           </div>
         </div>
       </div>
@@ -8108,17 +6653,6 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [allListings, setAllListings] = useState([]);
   const [dashView, setDashView] = useState("feed"); // feed | mylistings | claimed | impact | settings
-  // Clear unread badge when user opens Messages tab
-  const setDashViewSafe = useCallback(
-    (v) => {
-      setDashView(v);
-      if (v === "messages") {
-        setUnreadCount(0);
-        if (user) markMessagesRead(user.email);
-      }
-    },
-    [user]
-  );
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [user, setUser] = useState(() => {
     try {
@@ -8134,9 +6668,7 @@ export default function App() {
         }
       } catch {}
       return u;
-    } catch {
-      return null;
-    }
+    } catch { return null; }
   });
 
   // Poll unread count every 15s when logged in (unified with notification polling)
@@ -8152,6 +6684,15 @@ export default function App() {
     poll();
     const t = setInterval(poll, 15000);
     return () => clearInterval(t);
+  }, [user]);
+
+  // Clear unread badge when user opens Messages tab
+  const setDashViewSafe = useCallback((v) => {
+    setDashView(v);
+    if (v === "messages") {
+      setUnreadCount(0);
+      if (user) markMessagesRead(user.email);
+    }
   }, [user]);
 
   const missionRef = useRef(null);
@@ -8194,7 +6735,7 @@ export default function App() {
   const handleSignOut = () => setShowSignOutConfirm(true);
   const confirmSignOut = () => {
     try {
-      Object.keys(localStorage).forEach((k) => {
+      Object.keys(localStorage).forEach(k => {
         if (k.startsWith("eq_")) localStorage.removeItem(k);
       });
       sessionStorage.clear();
@@ -8207,132 +6748,106 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <div className="font-sans antialiased text-slate-900 bg-white">
-        <CookieBanner onPrivacy={() => setShowPrivacy(true)} />
-        {showAuth && (
-          <AuthModal
-            onClose={() => setShowAuth(false)}
-            onSuccess={handleAuthSuccess}
-          />
-        )}
-        <PrivacyModal
-          isOpen={showPrivacy}
-          onClose={() => setShowPrivacy(false)}
-          onAgree={() => setShowPrivacy(false)}
+    <div className="font-sans antialiased text-slate-900 bg-white">
+      <CookieBanner onPrivacy={() => setShowPrivacy(true)} />
+      {showAuth && (
+        <AuthModal
+          onClose={() => setShowAuth(false)}
+          onSuccess={handleAuthSuccess}
         />
-        {chatListing && (
-          <ChatWindow
-            listing={chatListing}
-            user={user}
-            onClose={() => setChatListing(null)}
-          />
-        )}
-        {showInbox && (
-          <InboxModal
-            user={user}
-            onClose={() => setShowInbox(false)}
-            onOpenChat={(l) => {
-              setChatListing(l);
-              setShowInbox(false);
-            }}
-            allListings={allListings}
-          />
-        )}
-        {/* Sign Out Confirmation */}
-        {showSignOutConfirm && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div
-              className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-              onClick={() => setShowSignOutConfirm(false)}
-            />
-            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
-              <div className="text-4xl mb-3">👋</div>
-              <h3 className="text-[17px] font-bold text-slate-900 mb-2">
-                Sign out?
-              </h3>
-              <p className="text-[13px] text-slate-500 mb-6">
-                Are you sure you want to sign out of Equilinkz?
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowSignOutConfirm(false)}
-                  className="flex-1 py-3 text-[14px] font-semibold text-slate-700 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmSignOut}
-                  className="flex-1 py-3 text-[14px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all"
-                >
-                  Sign Out
-                </button>
-              </div>
+      )}
+      <PrivacyModal
+        isOpen={showPrivacy}
+        onClose={() => setShowPrivacy(false)}
+        onAgree={() => setShowPrivacy(false)}
+      />
+      {chatListing && (
+        <ChatWindow
+          listing={chatListing}
+          user={user}
+          onClose={() => setChatListing(null)}
+        />
+      )}
+      {showInbox && (
+        <InboxModal
+          user={user}
+          onClose={() => setShowInbox(false)}
+          onOpenChat={(l) => {
+            setChatListing(l);
+            setShowInbox(false);
+          }}
+          allListings={allListings}
+        />
+      )}
+      {/* Sign Out Confirmation */}
+      {showSignOutConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowSignOutConfirm(false)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="text-4xl mb-3">👋</div>
+            <h3 className="text-[17px] font-bold text-slate-900 mb-2">Sign out?</h3>
+            <p className="text-[13px] text-slate-500 mb-6">Are you sure you want to sign out of Equilinkz?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowSignOutConfirm(false)} className="flex-1 py-3 text-[14px] font-semibold text-slate-700 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all">Cancel</button>
+              <button onClick={confirmSignOut} className="flex-1 py-3 text-[14px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all">Sign Out</button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {user ? (
-          /* ── LOGGED IN: Facebook-style dashboard ── */
-          <Dashboard
+      {user ? (
+        /* ── LOGGED IN: Facebook-style dashboard ── */
+        <Dashboard
+          user={user}
+          dashView={dashView}
+          setDashView={setDashViewSafe}
+          onSignOut={handleSignOut}
+          unreadCount={unreadCount}
+          onOpenChat={(l) => { setActiveChatListing(l); setDashViewSafe("messages"); }}
+          onOpenInbox={() => setDashViewSafe("messages")}
+          refreshTrigger={refreshTrigger}
+          onRefresh={() => setRefreshTrigger(n => n + 1)}
+          allListings={allListings}
+          onListingsLoaded={setAllListings}
+          activeChatListing={activeChatListing}
+          onClearActiveChat={() => setActiveChatListing(null)}
+        />
+      ) : (
+        /* ── LOGGED OUT: Landing page ── */
+        <>
+          <Navbar
+            onMission={() => scrollToId("mission")}
+            onBrowse={() => setShowAuth(true)}
+            onPartners={() => scrollToId("partners")}
+            onImpact={() => scrollToId("impact")}
+            onDonate={() => setShowAuth(true)}
             user={user}
-            dashView={dashView}
-            setDashView={setDashViewSafe}
+            onAuth={() => setShowAuth(true)}
             onSignOut={handleSignOut}
-            unreadCount={unreadCount}
-            onOpenChat={(l) => {
-              setActiveChatListing(l);
-              setDashViewSafe("messages");
-            }}
-            onOpenInbox={() => setDashViewSafe("messages")}
-            refreshTrigger={refreshTrigger}
-            onRefresh={() => setRefreshTrigger((n) => n + 1)}
+            onInbox={() => setShowInbox(true)}
+            onSettings={() => setShowSettings(true)}
+            onOpenChat={(l) => setChatListing(l)}
             allListings={allListings}
-            onListingsLoaded={setAllListings}
-            activeChatListing={activeChatListing}
-            onClearActiveChat={() => setActiveChatListing(null)}
+            unreadCount={unreadCount}
           />
-        ) : (
-          /* ── LOGGED OUT: Landing page ── */
-          <>
-            <Navbar
-              onMission={() => scrollToId("mission")}
-              onBrowse={() => setShowAuth(true)}
-              onPartners={() => scrollToId("partners")}
-              onImpact={() => scrollToId("impact")}
-              onDonate={() => setShowAuth(true)}
-              user={user}
-              onAuth={() => setShowAuth(true)}
-              onSignOut={handleSignOut}
-              onInbox={() => setShowInbox(true)}
-              onSettings={() => setShowSettings(true)}
-              onOpenChat={(l) => setChatListing(l)}
-              allListings={allListings}
-              unreadCount={unreadCount}
-            />
-            <Hero
-              onBrowse={() => setShowAuth(true)}
-              onDonate={() => setShowAuth(true)}
-            />
-            <HowItWorksSection
-              onBrowse={() => setShowAuth(true)}
-              onDonate={() => setShowAuth(true)}
-              onAuth={() => setShowAuth(true)}
-              user={user}
-            />
-            <LandingListingPreview onAuth={() => setShowAuth(true)} />
-            <div ref={missionRef}>
-              <MissionSection />
-            </div>
-            <div ref={partnersRef}>
-              <PartnersSection />
-            </div>
-            <div ref={impactRef}>
-              <ImpactSection />
-            </div>
-            <Footer onPrivacy={() => setShowPrivacy(true)} />
-          </>
-        )}
-      </div>
+          <Hero
+            onBrowse={() => setShowAuth(true)}
+            onDonate={() => setShowAuth(true)}
+          />
+          <HowItWorksSection
+            onBrowse={() => setShowAuth(true)}
+            onDonate={() => setShowAuth(true)}
+            onAuth={() => setShowAuth(true)}
+            user={user}
+          />
+          <LandingListingPreview onAuth={() => setShowAuth(true)} />
+          <div ref={missionRef}><MissionSection /></div>
+          <div ref={partnersRef}><PartnersSection /></div>
+          <div ref={impactRef}><ImpactSection /></div>
+          <Footer onPrivacy={() => setShowPrivacy(true)} />
+        </>
+      )}
+    </div>
     </ToastProvider>
   );
 }
