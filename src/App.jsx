@@ -2437,11 +2437,24 @@ function RecipientPinModal({ pin, listing, onClose }) {
 
 // KEY B — Donor (owner) view only. Rendered exclusively when auth.uid === owner_id.
 // Contains the input field, validation, and handleHandshakeVerify submission.
-function OwnerVerifyModal({ listing, user, onVerified, onClose }) {
+function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
   const [input, setInput] = useState("");
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [realPin, setRealPin] = useState(listing.verification_pin ?? null);
+  const [pinLoading, setPinLoading] = useState(false);
+
+  // Fetch the real PIN on mount — listing object may not have it if stripped from public fetch
+  useEffect(() => {
+    if (fetchPin && (realPin === null || realPin === undefined)) {
+      setPinLoading(true);
+      fetchPin().then((p) => {
+        if (p !== null) setRealPin(p);
+        setPinLoading(false);
+      });
+    }
+  }, []);
 
   // ── Security gate: only render submission logic if session owner matches ──
   const isAuthorizedOwner =
@@ -2465,7 +2478,11 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose }) {
       );
       return;
     }
-    if (input.trim() !== String(listing.verification_pin)) {
+    if (realPin === null || realPin === undefined) {
+      setError("Could not load PIN. Please close and try again.");
+      return;
+    }
+    if (input.trim() !== String(realPin)) {
       const remaining = MAX_ATTEMPTS - attempts - 1;
       setAttempts((a) => a + 1);
       setError(
@@ -2491,13 +2508,8 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose }) {
         method: "DELETE",
         headers: getHeaders(getToken()),
       });
-      // If delete fails, listing stays as "transferred" (not stuck in pending)
-      if (!res.ok) {
-        // Mark as transferred in UI even if delete fails
-        console.warn(
-          "Delete failed after transfer mark — listing marked transferred, not stuck."
-        );
-      }
+      // Whether delete succeeded or not, we mark as transferred and move on
+      // The PATCH above already set status to "transferred" so nothing is stuck
       setSuccess(true);
       createNotification(
         listing.claimer_id,
@@ -2517,6 +2529,19 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose }) {
       setLoading(false);
     }
   };
+
+  // ── Show loading while fetching PIN ────────────────────────────────────────
+  if (pinLoading) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" />
+        <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 flex flex-col items-center gap-3">
+          <IconLoader />
+          <p className="text-[14px] text-slate-500">Loading verification…</p>
+        </div>
+      </div>
+    );
+  }
 
   // ── If not the owner, render blocked state — no inputs exposed ────────────
   if (!isAuthorizedOwner) {
@@ -4797,6 +4822,20 @@ function ListingCard({
             onTransferred(id);
           }}
           onClose={() => setShowOwnerVerify(false)}
+          fetchPin={async () => {
+            // Fetch the PIN directly from DB when modal opens — ensures it's always fresh
+            try {
+              const res = await fetch(
+                `${SUPABASE_URL}/listings?id=eq.${listing.id}&select=verification_pin`,
+                { headers: getHeaders(getToken()) }
+              );
+              if (!res.ok) return null;
+              const data = await res.json();
+              return data?.[0]?.verification_pin ?? null;
+            } catch {
+              return null;
+            }
+          }}
         />
       )}
       {/* Photo Lightbox */}
@@ -8069,6 +8108,17 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [allListings, setAllListings] = useState([]);
   const [dashView, setDashView] = useState("feed"); // feed | mylistings | claimed | impact | settings
+  // Clear unread badge when user opens Messages tab
+  const setDashViewSafe = useCallback(
+    (v) => {
+      setDashView(v);
+      if (v === "messages") {
+        setUnreadCount(0);
+        if (user) markMessagesRead(user.email);
+      }
+    },
+    [user]
+  );
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [user, setUser] = useState(() => {
     try {
@@ -8226,14 +8276,14 @@ export default function App() {
           <Dashboard
             user={user}
             dashView={dashView}
-            setDashView={setDashView}
+            setDashView={setDashViewSafe}
             onSignOut={handleSignOut}
             unreadCount={unreadCount}
             onOpenChat={(l) => {
               setActiveChatListing(l);
-              setDashView("messages");
+              setDashViewSafe("messages");
             }}
-            onOpenInbox={() => setDashView("messages")}
+            onOpenInbox={() => setDashViewSafe("messages")}
             refreshTrigger={refreshTrigger}
             onRefresh={() => setRefreshTrigger((n) => n + 1)}
             allListings={allListings}
