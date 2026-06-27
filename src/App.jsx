@@ -6959,6 +6959,7 @@ function EnterPinButton({ listing, user, onTransferred }) {
         method: "DELETE",
         headers: getHeaders(getToken()),
       });
+      incrementDonorTransfers(listing.owner_email, getToken());
       setShow(false);
       if (onTransferred) onTransferred(listing.id);
     } catch (err) {
