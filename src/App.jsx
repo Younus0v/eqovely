@@ -4968,6 +4968,13 @@ function ListingsSection({
     return parseInt(localStorage.getItem("eq_transferred_count") || "0");
   });
 
+  // Re-sync transferredCount from localStorage whenever listings refresh
+  useEffect(() => {
+    setTransferredCount(
+      parseInt(localStorage.getItem("eq_transferred_count") || "0")
+    );
+  }, [refreshTrigger]);
+
   // ── View state: 'dashboard' shows 3-card preview, 'marketplace' shows all ──
   const [currentView, setCurrentView] = useState("dashboard");
   const [selectedListing, setSelectedListing] = useState(null);
@@ -6960,6 +6967,12 @@ function EnterPinButton({ listing, user, onTransferred }) {
         headers: getHeaders(getToken()),
       });
       incrementDonorTransfers(listing.owner_email, getToken());
+      // Update the Units Transferred counter in localStorage directly
+      const qty = parseInt(listing.quantity) || 1;
+      const prev = parseInt(
+        localStorage.getItem("eq_transferred_count") || "0"
+      );
+      localStorage.setItem("eq_transferred_count", String(prev + qty));
       setShow(false);
       if (onTransferred) onTransferred(listing.id);
     } catch (err) {
