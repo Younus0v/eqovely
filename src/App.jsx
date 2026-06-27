@@ -2459,7 +2459,9 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
   // ── Security gate: only render submission logic if session owner matches ──
   const isAuthorizedOwner =
     user &&
-    (user.id === listing.owner_id || user.email === listing.owner_email);
+    user.email &&
+    listing.owner_email &&
+    user.email.toLowerCase() === listing.owner_email.toLowerCase();
 
   // ── handleHandshakeVerify: dual-key validation loop ───────────────────────
   const [attempts, setAttempts] = useState(0);
