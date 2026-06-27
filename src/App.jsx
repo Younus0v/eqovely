@@ -7673,11 +7673,12 @@ function DashboardContent({
                       <EnterPinButton
                         listing={l}
                         user={user}
-                        onTransferred={() =>
+                        onTransferred={() => {
                           setMyListings((prev) =>
                             prev.filter((x) => x.id !== l.id)
-                          )
-                        }
+                          );
+                          if (onRefresh) onRefresh();
+                        }}
                       />
                     )}
                   </div>
