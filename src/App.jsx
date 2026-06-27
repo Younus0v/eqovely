@@ -4535,7 +4535,10 @@ function ListingCard({
                   {/* Key B Verify PIN — rendered only when item is pending handshake */}
                   {!isTransferred && isClaimed && (
                     <button
-                      onClick={() => setShowOwnerVerify(true)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowOwnerVerify(true);
+                      }}
                       className="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-blue-600 hover:bg-blue-700 border border-blue-700 rounded-lg px-3 py-1.5 transition-all shadow-sm"
                     >
                       <IconShield /> Enter Recipient PIN
