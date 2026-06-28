@@ -5003,48 +5003,10 @@ function ListingsSection({
     setLoading(true);
     setError(null);
     try {
-      // Try with current token first
-      let token = getToken();
-      let res = await fetch(
+      const res = await fetch(
         `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
-        { headers: getHeaders(token) }
+        { headers: getHeaders(getToken()) }
       );
-      // If 401, try refreshing token then retry
-      if (res.status === 401) {
-        const refreshToken = localStorage.getItem("eq_refresh_token");
-        if (refreshToken) {
-          try {
-            const refreshRes = await fetch(
-              `${AUTH_URL}/token?grant_type=refresh_token`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  apikey: SUPABASE_ANON_KEY,
-                },
-                body: JSON.stringify({ refresh_token: refreshToken }),
-              }
-            );
-            if (refreshRes.ok) {
-              const refreshData = await refreshRes.json();
-              if (refreshData.access_token) {
-                localStorage.setItem("eq_token", refreshData.access_token);
-                if (refreshData.refresh_token)
-                  localStorage.setItem(
-                    "eq_refresh_token",
-                    refreshData.refresh_token
-                  );
-                token = refreshData.access_token;
-              }
-            }
-          } catch {}
-        }
-        // Retry with new token or anon
-        res = await fetch(
-          `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
-          { headers: getHeaders(token) }
-        );
-      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setListings(data);
