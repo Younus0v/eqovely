@@ -1903,6 +1903,8 @@ function AuthModal({ onClose, onSuccess }) {
           // SECURITY: localStorage tokens are vulnerable to XSS exfiltration.
           // In production, prefer HttpOnly secure cookies via a backend auth proxy.
           localStorage.setItem("eq_token", data.access_token);
+          if (data.refresh_token)
+            localStorage.setItem("eq_refresh_token", data.refresh_token);
           localStorage.setItem("eq_user", JSON.stringify(u));
           // Save username to profiles table for duplicate checking
           try {
@@ -1964,6 +1966,8 @@ function AuthModal({ onClose, onSuccess }) {
           tax_id: m.tax_id || "",
         };
         localStorage.setItem("eq_token", data.access_token);
+        if (data.refresh_token)
+          localStorage.setItem("eq_refresh_token", data.refresh_token);
         localStorage.setItem("eq_user", JSON.stringify(u));
         onSuccess(u);
       }
@@ -4205,10 +4209,7 @@ function ListingCard({
       return;
     setDeleting(true);
     try {
-      await fetch(`${SUPABASE_URL}/messages?listing_id=eq.${listing.id}`, {
-        method: "DELETE",
-        headers: getHeaders(getToken()),
-      });
+      // Messages are intentionally kept — users can still see chat history after transfer
       await fetch(`${SUPABASE_URL}/notifications?listing_id=eq.${listing.id}`, {
         method: "DELETE",
         headers: getHeaders(getToken()),
@@ -4964,15 +4965,34 @@ function ListingsSection({
   const searchDebounce = useRef(null);
   const [tab, setTab] = useState("marketplace");
   const [pinData, setPinData] = useState(null); // {pin, listing}
-  const [transferredCount, setTransferredCount] = useState(() => {
-    return parseInt(localStorage.getItem("eq_transferred_count") || "0");
-  });
+  const [transferredCount, setTransferredCount] = useState(0);
 
-  // Re-sync transferredCount from localStorage whenever listings refresh
+  // Fetch global Units Transferred from profiles table — same number for all users
   useEffect(() => {
-    setTransferredCount(
-      parseInt(localStorage.getItem("eq_transferred_count") || "0")
-    );
+    const fetchGlobalTransferred = async () => {
+      try {
+        // Use anon key only — public read, no auth needed
+        const res = await fetch(
+          `${SUPABASE_URL}/profiles?select=transfers_completed`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const total = data.reduce(
+            (sum, p) => sum + (parseInt(p.transfers_completed) || 0),
+            0
+          );
+          setTransferredCount(total);
+        }
+      } catch {}
+    };
+    fetchGlobalTransferred();
   }, [refreshTrigger]);
 
   // ── View state: 'dashboard' shows 3-card preview, 'marketplace' shows all ──
@@ -5006,14 +5026,27 @@ function ListingsSection({
       )
     );
   const handleTransferred = (id) => {
-    const listing = listings.find((l) => String(l.id) === String(id));
-    const qty = parseInt(listing?.quantity) || 1;
     setListings((p) => p.filter((l) => String(l.id) !== String(id)));
-    setTransferredCount((prev) => {
-      const next = prev + qty;
-      localStorage.setItem("eq_transferred_count", String(next));
-      return next;
-    });
+    // Re-fetch global transferred count from DB after a short delay
+    setTimeout(() => {
+      fetch(`${SUPABASE_URL}/profiles?select=transfers_completed`, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          "Content-Type": "application/json",
+        },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            const total = data.reduce(
+              (sum, p) => sum + (parseInt(p.transfers_completed) || 0),
+              0
+            );
+            setTransferredCount(total);
+          }
+        })
+        .catch(() => {});
+    }, 1000);
   };
 
   useEffect(() => {
@@ -6559,18 +6592,22 @@ function ListingDetailModal({
           <IconX />
         </button>
 
-        {/* Image carousel */}
+        {/* Image carousel — full screen, high quality */}
         <div
-          className="relative w-full bg-slate-100 shrink-0"
-          style={{ height: "280px" }}
+          className="relative w-full bg-black shrink-0"
+          style={{ height: "min(60vw, 420px)" }}
         >
           {images.length > 0 ? (
             <>
+              {/* Full quality image — object-contain so nothing is cropped */}
               <img
                 src={images[imgIndex]}
                 alt={listing.title}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
+                style={{ background: "#000" }}
               />
+              {/* Subtle dark gradient at bottom for dots visibility */}
+              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
               {images.length > 1 && (
                 <>
                   <button
@@ -6579,13 +6616,13 @@ function ListingDetailModal({
                         (i) => (i - 1 + images.length) % images.length
                       )
                     }
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-sm"
                   >
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2"
+                      strokeWidth="2.5"
                       className="w-4 h-4"
                     >
                       <path
@@ -6597,13 +6634,13 @@ function ListingDetailModal({
                   </button>
                   <button
                     onClick={() => setImgIndex((i) => (i + 1) % images.length)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center shadow text-slate-700 transition-all"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-sm"
                   >
                     <svg
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
-                      strokeWidth="2"
+                      strokeWidth="2.5"
                       className="w-4 h-4"
                     >
                       <path
@@ -6613,13 +6650,16 @@ function ListingDetailModal({
                       />
                     </svg>
                   </button>
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+                  {/* White dot indicators */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 items-center">
                     {images.map((_, i) => (
                       <button
                         key={i}
                         onClick={() => setImgIndex(i)}
-                        className={`w-1.5 h-1.5 rounded-full transition-all ${
-                          i === imgIndex ? "bg-white w-4" : "bg-white/50"
+                        className={`rounded-full transition-all duration-300 ${
+                          i === imgIndex
+                            ? "w-5 h-2 bg-white"
+                            : "w-2 h-2 bg-white/50 hover:bg-white/80"
                         }`}
                       />
                     ))}
@@ -6628,7 +6668,7 @@ function ListingDetailModal({
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl">
+            <div className="w-full h-full flex items-center justify-center text-6xl bg-slate-100">
               📦
             </div>
           )}
@@ -8325,19 +8365,53 @@ export default function App() {
       const u = JSON.parse(localStorage.getItem("eq_user"));
       const token = localStorage.getItem("eq_token");
       if (!u || !token) return null;
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        if (payload.exp && payload.exp * 1000 < Date.now()) {
-          localStorage.removeItem("eq_token");
-          localStorage.removeItem("eq_user");
-          return null;
-        }
-      } catch {}
+      // Never auto sign-out on load — token refresh handles keeping session alive
       return u;
     } catch {
       return null;
     }
   });
+
+  // ── Auto token refresh — keeps user logged in ────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const refreshSession = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const expiresIn = payload.exp * 1000 - Date.now();
+        // If token expires in less than 10 minutes, refresh it
+        if (expiresIn < 10 * 60 * 1000) {
+          const refreshToken = localStorage.getItem("eq_refresh_token");
+          if (!refreshToken) return;
+          const res = await fetch(
+            `${AUTH_URL}/token?grant_type=refresh_token`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                apikey: SUPABASE_ANON_KEY,
+              },
+              body: JSON.stringify({ refresh_token: refreshToken }),
+            }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data.access_token) {
+              localStorage.setItem("eq_token", data.access_token);
+              if (data.refresh_token)
+                localStorage.setItem("eq_refresh_token", data.refresh_token);
+            }
+          }
+        }
+      } catch {}
+    };
+    // Check every 5 minutes
+    refreshSession();
+    const interval = setInterval(refreshSession, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   // Poll unread count every 15s when logged in (unified with notification polling)
   useEffect(() => {
