@@ -2890,13 +2890,12 @@ function InboxModal({
   // Auto-open a listing chat when navigating from a listing card
   useEffect(() => {
     if (autoOpenListing && !activeListing) {
-      setActiveListing({
-        ...autoOpenListing,
-        _otherName:
-          autoOpenListing.owner_org_name ||
-          autoOpenListing.owner_email ||
-          "Donor",
-      });
+      const otherName =
+        autoOpenListing._otherName ||
+        autoOpenListing.owner_org_name ||
+        autoOpenListing.owner_email ||
+        "Donor";
+      setActiveListing({ ...autoOpenListing, _otherName: otherName });
       if (onAutoOpenHandled) onAutoOpenHandled();
     }
   }, [autoOpenListing]);
@@ -3117,7 +3116,7 @@ function InboxModal({
                     {last?.message_text || ""}
                   </p>
                   <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                    {listing?.title || "Listing"}
+                    {listing?.title || last?.topic || "Past Conversation"}
                   </p>
                 </div>
                 {unread > 0 && (
@@ -3951,20 +3950,33 @@ async function incrementDonorTransfers(ownerEmail, token) {
       )}&select=transfers_completed`,
       { headers: getHeaders(token) }
     );
-    if (!res.ok) return;
-    const data = await res.json();
+    const data = res.ok ? await res.json() : [];
     const current = (Array.isArray(data) && data[0]?.transfers_completed) || 0;
-    // Increment
-    await fetch(
-      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}`,
-      {
-        method: "PATCH",
+
+    if (Array.isArray(data) && data.length > 0) {
+      // Profile exists — PATCH to increment
+      await fetch(
+        `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}`,
+        {
+          method: "PATCH",
+          headers: getHeaders(token),
+          body: JSON.stringify({ transfers_completed: current + 1 }),
+        }
+      );
+    } else {
+      // Profile row missing — insert it
+      await fetch(`${SUPABASE_URL}/profiles`, {
+        method: "POST",
         headers: getHeaders(token),
-        body: JSON.stringify({ transfers_completed: current + 1 }),
-      }
-    );
+        body: JSON.stringify({
+          email: ownerEmail,
+          transfers_completed: 1,
+          username: "",
+        }),
+      });
+    }
   } catch (e) {
-    console.warn("Could not update donor transfer count:", e.message);
+    console.error("incrementDonorTransfers error:", e.message);
   }
 }
 
@@ -4639,17 +4651,22 @@ function ListingCard({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleClaim();
+                          if (!alreadyClaimed && !isDone) handleClaim();
                         }}
-                        disabled={claiming || !user}
+                        disabled={claiming || !user || alreadyClaimed || isDone}
                         className={`flex items-center gap-1.5 text-[12px] font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-sm ${
-                          !user
+                          !user || alreadyClaimed || isDone
                             ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                             : "bg-blue-600 hover:bg-blue-700 text-white hover:-translate-y-0.5 shadow-blue-200"
                         }`}
                       >
                         {claiming ? (
                           <IconLoader />
+                        ) : alreadyClaimed ? (
+                          <>
+                            <IconCheck />
+                            <span>Claimed</span>
+                          </>
                         ) : (
                           <>
                             <span>Claim Item</span> <IconArrow />
@@ -4948,6 +4965,7 @@ function ListingsSection({
   user,
   onOpenChat,
   onListingsLoaded,
+  onClaimSuccess,
   dashMode = false,
 }) {
   const [listings, setListings] = useState([]);
@@ -5003,10 +5021,48 @@ function ListingsSection({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(
+      // Try with current token first
+      let token = getToken();
+      let res = await fetch(
         `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
-        { headers: getHeaders(getToken()) }
+        { headers: getHeaders(token) }
       );
+      // If 401, try refreshing token then retry
+      if (res.status === 401) {
+        const refreshToken = localStorage.getItem("eq_refresh_token");
+        if (refreshToken) {
+          try {
+            const refreshRes = await fetch(
+              `${AUTH_URL}/token?grant_type=refresh_token`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  apikey: SUPABASE_ANON_KEY,
+                },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+              }
+            );
+            if (refreshRes.ok) {
+              const refreshData = await refreshRes.json();
+              if (refreshData.access_token) {
+                localStorage.setItem("eq_token", refreshData.access_token);
+                if (refreshData.refresh_token)
+                  localStorage.setItem(
+                    "eq_refresh_token",
+                    refreshData.refresh_token
+                  );
+                token = refreshData.access_token;
+              }
+            }
+          } catch {}
+        }
+        // Retry with new token or anon
+        res = await fetch(
+          `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
+          { headers: getHeaders(token) }
+        );
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setListings(data);
@@ -5019,12 +5075,25 @@ function ListingsSection({
   };
 
   const handleDelete = (id) => setListings((p) => p.filter((l) => l.id !== id));
-  const handleClaim = (id, pin) =>
-    setListings((p) =>
-      p.map((l) =>
-        l.id === id ? { ...l, status: "pending", verification_pin: pin } : l
-      )
-    );
+  const handleClaim = (id, pin) => {
+    setListings((p) => {
+      const updated = p.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              status: "pending",
+              verification_pin: pin,
+              claimer_id: user?.email,
+            }
+          : l
+      );
+      // Notify parent so allListings and Claimed Items page update
+      if (onListingsLoaded) onListingsLoaded(updated);
+      return updated;
+    });
+    // Trigger refreshTrigger increment so Claimed Items page re-fetches from DB
+    if (onClaimSuccess) setTimeout(onClaimSuccess, 500);
+  };
   const handleTransferred = (id) => {
     setListings((p) => p.filter((l) => String(l.id) !== String(id)));
     // Re-fetch global transferred count from DB after a short delay
@@ -5058,10 +5127,13 @@ function ListingsSection({
 
   // ── RBAC: Derive role ─────────────────────────────────────────────────────
   const isDonor =
-    !user ||
-    ["Individual Donor", "Corporate/Lab Donor"].includes(user.account_type);
+    user &&
+    ["Individual Donor", "Corporate/Lab Donor"].includes(user?.account_type);
   const isRecipientUser =
-    user && user.account_type === "School/Non-Profit Recipient";
+    user &&
+    ["School/Non-Profit Recipient", "Individual Recipient"].includes(
+      user?.account_type
+    );
 
   // ── Base filter pipeline (used by both views) ─────────────────────────────
   let filtered = listings;
@@ -7611,6 +7683,7 @@ function DashboardContent({
             user={user}
             onOpenChat={onOpenChat}
             onListingsLoaded={onListingsLoaded}
+            onClaimSuccess={onRefresh}
             dashMode={true}
           />
         )}
