@@ -1955,15 +1955,22 @@ function AuthModal({ onClose, onSuccess }) {
             data.error_description || data.message || "Login failed"
           );
         const m = data.user?.user_metadata || {};
+        // Read stored user to preserve account_type if metadata is missing
+        let storedUser = {};
+        try {
+          storedUser = JSON.parse(localStorage.getItem("eq_user") || "{}");
+        } catch {}
         const u = {
-          ...data.user,
-          username: m.username || "",
-          phone: m.phone || "",
-          org_name: m.org_name || "",
-          region: m.region || "",
-          account_type: m.account_type || "",
-          institution_domain: m.institution_domain || "",
-          tax_id: m.tax_id || "",
+          id: data.user.id,
+          email: data.user.email,
+          username: m.username || storedUser.username || "",
+          phone: m.phone || storedUser.phone || "",
+          org_name: m.org_name || storedUser.org_name || "",
+          region: m.region || storedUser.region || "",
+          account_type: m.account_type || storedUser.account_type || "",
+          institution_domain:
+            m.institution_domain || storedUser.institution_domain || "",
+          tax_id: m.tax_id || storedUser.tax_id || "",
         };
         localStorage.setItem("eq_token", data.access_token);
         if (data.refresh_token)
@@ -2701,7 +2708,18 @@ function SettingsModal({ user, onClose, onUpdated, onDeleted }) {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${getToken()}`,
         },
-        body: JSON.stringify({ data: { ...user, username: username.trim() } }),
+        body: JSON.stringify({
+          data: {
+            username: username.trim(),
+            account_type: user?.account_type || "",
+            phone: user?.phone || "",
+            region: user?.region || "",
+            org_name: user?.org_name || "",
+            email: user?.email || "",
+            institution_domain: user?.institution_domain || "",
+            tax_id: user?.tax_id || "",
+          },
+        }),
       });
       if (!res.ok) throw new Error("Failed to update profile.");
       const updated = { ...user, username: username.trim() };
@@ -2890,12 +2908,13 @@ function InboxModal({
   // Auto-open a listing chat when navigating from a listing card
   useEffect(() => {
     if (autoOpenListing && !activeListing) {
-      const otherName =
-        autoOpenListing._otherName ||
-        autoOpenListing.owner_org_name ||
-        autoOpenListing.owner_email ||
-        "Donor";
-      setActiveListing({ ...autoOpenListing, _otherName: otherName });
+      setActiveListing({
+        ...autoOpenListing,
+        _otherName:
+          autoOpenListing.owner_org_name ||
+          autoOpenListing.owner_email ||
+          "Donor",
+      });
       if (onAutoOpenHandled) onAutoOpenHandled();
     }
   }, [autoOpenListing]);
@@ -3116,7 +3135,7 @@ function InboxModal({
                     {last?.message_text || ""}
                   </p>
                   <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                    {listing?.title || last?.topic || "Past Conversation"}
+                    {listing?.title || "Listing"}
                   </p>
                 </div>
                 {unread > 0 && (
@@ -3943,7 +3962,6 @@ function incrementUnitsTransferred() {}
 async function incrementDonorTransfers(ownerEmail, token) {
   if (!ownerEmail) return;
   try {
-    // Fetch current count
     const res = await fetch(
       `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
         ownerEmail
@@ -3952,9 +3970,7 @@ async function incrementDonorTransfers(ownerEmail, token) {
     );
     const data = res.ok ? await res.json() : [];
     const current = (Array.isArray(data) && data[0]?.transfers_completed) || 0;
-
     if (Array.isArray(data) && data.length > 0) {
-      // Profile exists — PATCH to increment
       await fetch(
         `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}`,
         {
@@ -4651,22 +4667,17 @@ function ListingCard({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!alreadyClaimed && !isDone) handleClaim();
+                          handleClaim();
                         }}
-                        disabled={claiming || !user || alreadyClaimed || isDone}
+                        disabled={claiming || !user}
                         className={`flex items-center gap-1.5 text-[12px] font-semibold px-3.5 py-1.5 rounded-xl transition-all shadow-sm ${
-                          !user || alreadyClaimed || isDone
+                          !user
                             ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                             : "bg-blue-600 hover:bg-blue-700 text-white hover:-translate-y-0.5 shadow-blue-200"
                         }`}
                       >
                         {claiming ? (
                           <IconLoader />
-                        ) : alreadyClaimed ? (
-                          <>
-                            <IconCheck />
-                            <span>Claimed</span>
-                          </>
                         ) : (
                           <>
                             <span>Claim Item</span> <IconArrow />
@@ -5087,12 +5098,10 @@ function ListingsSection({
             }
           : l
       );
-      // Notify parent so allListings and Claimed Items page update
       if (onListingsLoaded) onListingsLoaded(updated);
       return updated;
     });
-    // Trigger refreshTrigger increment so Claimed Items page re-fetches from DB
-    if (onClaimSuccess) setTimeout(onClaimSuccess, 500);
+    if (onClaimSuccess) setTimeout(onClaimSuccess, 800);
   };
   const handleTransferred = (id) => {
     setListings((p) => p.filter((l) => String(l.id) !== String(id)));
@@ -5126,14 +5135,14 @@ function ListingsSection({
   }, [catFilter, regionFilter, locationSearch, searchQuery, tab]);
 
   // ── RBAC: Derive role ─────────────────────────────────────────────────────
-  const isDonor =
-    user &&
-    ["Individual Donor", "Corporate/Lab Donor"].includes(user?.account_type);
+  const DONOR_TYPES_LS = ["Individual Donor", "Corporate/Lab Donor"];
+  const RECIPIENT_TYPES_LS = [
+    "School/Non-Profit Recipient",
+    "Individual Recipient",
+  ];
+  const isDonor = user && DONOR_TYPES_LS.includes(user?.account_type || "");
   const isRecipientUser =
-    user &&
-    ["School/Non-Profit Recipient", "Individual Recipient"].includes(
-      user?.account_type
-    );
+    user && RECIPIENT_TYPES_LS.includes(user?.account_type || "");
 
   // ── Base filter pipeline (used by both views) ─────────────────────────────
   let filtered = listings;
@@ -5850,7 +5859,7 @@ function FormSection({ onSuccess, user }) {
   const isRecipient = [
     "School/Non-Profit Recipient",
     "Individual Recipient",
-  ].includes(user?.account_type);
+  ].includes(user?.account_type || "");
   if (isRecipient) return null;
   const [form, setForm] = useState(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -7205,13 +7214,13 @@ function Dashboard({
   activeChatListing,
   onClearActiveChat,
 }) {
-  const isRecipient = [
+  const DONOR_TYPES_D = ["Individual Donor", "Corporate/Lab Donor"];
+  const RECIPIENT_TYPES_D = [
     "School/Non-Profit Recipient",
     "Individual Recipient",
-  ].includes(user?.account_type);
-  const isDonor = ["Corporate/Lab Donor", "Individual Donor"].includes(
-    user?.account_type
-  );
+  ];
+  const isRecipient = RECIPIENT_TYPES_D.includes(user?.account_type || "");
+  const isDonor = DONOR_TYPES_D.includes(user?.account_type || "");
   const initials = (user?.username || user?.org_name || user?.email || "U")
     .slice(0, 2)
     .toUpperCase();
@@ -7601,9 +7610,14 @@ function DashboardContent({
         },
         body: JSON.stringify({
           data: {
-            ...user,
             username: settingsUsername.trim(),
             org_name: settingsOrgName.trim(),
+            account_type: user?.account_type || "",
+            phone: user?.phone || "",
+            region: user?.region || "",
+            email: user?.email || "",
+            institution_domain: user?.institution_domain || "",
+            tax_id: user?.tax_id || "",
           },
         }),
       });
@@ -8438,7 +8452,18 @@ export default function App() {
       const u = JSON.parse(localStorage.getItem("eq_user"));
       const token = localStorage.getItem("eq_token");
       if (!u || !token) return null;
-      // Never auto sign-out on load — token refresh handles keeping session alive
+      // Ensure account_type is always present
+      if (!u.account_type) {
+        // Try to recover from Supabase token payload
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          const m = payload.user_metadata || {};
+          if (m.account_type) {
+            u.account_type = m.account_type;
+            localStorage.setItem("eq_user", JSON.stringify(u));
+          }
+        } catch {}
+      }
       return u;
     } catch {
       return null;
@@ -8475,6 +8500,29 @@ export default function App() {
               localStorage.setItem("eq_token", data.access_token);
               if (data.refresh_token)
                 localStorage.setItem("eq_refresh_token", data.refresh_token);
+              // Preserve account_type from stored user — never overwrite with empty metadata
+              if (data.user?.user_metadata) {
+                const m = data.user.user_metadata;
+                let storedUser = {};
+                try {
+                  storedUser = JSON.parse(
+                    localStorage.getItem("eq_user") || "{}"
+                  );
+                } catch {}
+                const refreshedUser = {
+                  id: data.user.id,
+                  email: data.user.email,
+                  username: m.username || storedUser.username || "",
+                  phone: m.phone || storedUser.phone || "",
+                  org_name: m.org_name || storedUser.org_name || "",
+                  region: m.region || storedUser.region || "",
+                  account_type: m.account_type || storedUser.account_type || "",
+                  institution_domain:
+                    m.institution_domain || storedUser.institution_domain || "",
+                  tax_id: m.tax_id || storedUser.tax_id || "",
+                };
+                localStorage.setItem("eq_user", JSON.stringify(refreshedUser));
+              }
             }
           }
         }
