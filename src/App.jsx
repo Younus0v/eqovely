@@ -765,7 +765,15 @@ function ChatWindow({ listing, user, onClose }) {
       if (!res.ok || !isMounted.current) return;
       const data = await res.json();
       if (!Array.isArray(data)) return;
-      setMessages(data); // Replace with authoritative server data
+      // Merge: keep optimistic messages not yet confirmed by server
+      setMessages((prev) => {
+        const serverIds = new Set(data.map((m) => String(m.id)));
+        const pendingOptimistic = prev.filter(
+          (m) =>
+            String(m.id).startsWith("temp-") && !serverIds.has(String(m.id))
+        );
+        return [...data, ...pendingOptimistic];
+      });
       setLastCount(data.length);
     } catch (_) {
     } finally {
@@ -847,7 +855,7 @@ function ChatWindow({ listing, user, onClose }) {
       ws.onerror = () => {
         // Fallback to polling if WebSocket fails
         if (!pollRef.current) {
-          pollRef.current = setInterval(fetchMessages, 1000);
+          pollRef.current = setInterval(fetchMessages, 4000);
         }
       };
 
@@ -855,12 +863,12 @@ function ChatWindow({ listing, user, onClose }) {
         clearInterval(pingInterval);
         // Fallback to polling on disconnect
         if (isMounted.current && !pollRef.current) {
-          pollRef.current = setInterval(fetchMessages, 1000);
+          pollRef.current = setInterval(fetchMessages, 4000);
         }
       };
     } catch (_) {
       // WebSocket not available — fall back to polling
-      pollRef.current = setInterval(fetchMessages, 1000);
+      pollRef.current = setInterval(fetchMessages, 4000);
     }
 
     return () => {
@@ -3177,7 +3185,7 @@ function InlineChatBody({ listing, user }) {
   useEffect(() => {
     isMounted.current = true;
     fetchMsgs();
-    pollRef.current = setInterval(fetchMsgs, 3000);
+    pollRef.current = setInterval(fetchMsgs, 5000);
     return () => {
       isMounted.current = false;
       clearInterval(pollRef.current);
@@ -3200,7 +3208,15 @@ function InlineChatBody({ listing, user }) {
       if (!res.ok || !isMounted.current) return;
       const data = await res.json();
       if (Array.isArray(data) && isMounted.current) {
-        setMessages(data);
+        // Merge: keep any optimistic (temp-) messages not yet in server data
+        setMessages((prev) => {
+          const serverIds = new Set(data.map((m) => String(m.id)));
+          const pendingOptimistic = prev.filter(
+            (m) =>
+              String(m.id).startsWith("temp-") && !serverIds.has(String(m.id))
+          );
+          return [...data, ...pendingOptimistic];
+        });
         // Mark received messages as read
         const unread = data.filter(
           (m) =>
@@ -4187,6 +4203,7 @@ function ListingCard({
   const [deleting, setDeleting] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editForm, setEditForm] = useState({
     title: listing.title || "",
     description: listing.description || "",
@@ -4229,12 +4246,7 @@ function ListingCard({
       alert("Security: you are not the owner of this listing.");
       return;
     }
-    if (
-      !window.confirm(
-        "Permanently delete this listing and all related data? This cannot be undone."
-      )
-    )
-      return;
+    // Confirmation already shown via modal — proceed with delete
     setDeleting(true);
     try {
       // Messages are intentionally kept — users can still see chat history after transfer
@@ -4310,6 +4322,10 @@ function ListingCard({
   };
 
   const handleEdit = async () => {
+    if (!user || user.email !== listing.owner_email) {
+      setEditError("Security: you are not the owner.");
+      return;
+    }
     if (!editForm.title.trim()) {
       setEditError("Title is required.");
       return;
@@ -4596,6 +4612,7 @@ function ListingCard({
                   >
                     <button
                       onClick={() => {
+                        if (!user || user.email !== listing.owner_email) return;
                         setEditForm({
                           title: listing.title || "",
                           description: listing.description || "",
@@ -4627,7 +4644,10 @@ function ListingCard({
                       Edit
                     </button>
                     <button
-                      onClick={handleDelete}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowDeleteConfirm(true);
+                      }}
                       disabled={deleting}
                       className="flex items-center gap-1.5 text-[12px] font-medium text-red-400 hover:text-red-600 border border-red-100 hover:border-red-200 rounded-lg px-2.5 py-1 transition-all"
                     >
@@ -4765,6 +4785,64 @@ function ListingCard({
         </div>
       </div>
       {/* PIN modal moved to parent ListingsSection */}
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
+            onClick={() => setShowDeleteConfirm(false)}
+          />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className="w-6 h-6 text-red-600"
+              >
+                <path
+                  d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+            <h3 className="text-[17px] font-bold text-slate-900 mb-2">
+              Delete Listing?
+            </h3>
+            <p className="text-[13px] text-slate-500 mb-6 leading-relaxed">
+              This will permanently delete{" "}
+              <span className="font-semibold text-slate-700">
+                "{listing.title}"
+              </span>
+              . This cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="flex-1 py-3 text-[14px] font-semibold text-slate-700 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  handleDelete();
+                }}
+                disabled={deleting}
+                className="flex-1 py-3 text-[14px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all disabled:bg-slate-300"
+              >
+                {deleting ? "Deleting…" : "Yes, Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit Listing Modal */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -6904,6 +6982,160 @@ function ListingDetailModal({
   );
 }
 
+// ─── Impact View — fetches real counts from DB ────────────────────────────────
+function ImpactView({ user, isDonor, isRecipient, refreshTrigger }) {
+  const [stats, setStats] = useState({
+    posted: 0,
+    transferred: 0,
+    available: 0,
+    claimed: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    setLoading(true);
+    const fetchStats = async () => {
+      try {
+        const token = getToken();
+        if (isDonor) {
+          // Fetch all listings by this user (including historical via profiles)
+          const [activeRes, profileRes] = await Promise.all([
+            fetch(
+              `${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(
+                user.email
+              )}&select=id,status`,
+              { headers: getHeaders(token) }
+            ),
+            fetch(
+              `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
+                user.email
+              )}&select=transfers_completed`,
+              { headers: getHeaders(token) }
+            ),
+          ]);
+          const activeListings = activeRes.ok ? await activeRes.json() : [];
+          const profileData = profileRes.ok ? await profileRes.json() : [];
+          const transferred =
+            (Array.isArray(profileData) &&
+              profileData[0]?.transfers_completed) ||
+            0;
+          const available = Array.isArray(activeListings)
+            ? activeListings.filter((l) => l.status === "available").length
+            : 0;
+          const pending = Array.isArray(activeListings)
+            ? activeListings.filter(
+                (l) => l.status === "pending" || l.status === "claimed"
+              ).length
+            : 0;
+          // Total posted = active + transferred (deleted ones counted via profiles)
+          const posted =
+            (Array.isArray(activeListings) ? activeListings.length : 0) +
+            transferred;
+          setStats({ posted, transferred, available, claimed: 0 });
+        } else if (isRecipient) {
+          const res = await fetch(
+            `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(
+              user.email
+            )}&select=id,status`,
+            { headers: getHeaders(token) }
+          );
+          const claimed = res.ok ? await res.json() : [];
+          setStats({
+            posted: 0,
+            transferred: 0,
+            available: 0,
+            claimed: Array.isArray(claimed) ? claimed.length : 0,
+          });
+        }
+      } catch {
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, [user, isDonor, isRecipient, refreshTrigger]);
+
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-6">
+        <h1 className="text-[22px] font-bold text-slate-900 mb-2">My Impact</h1>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm animate-pulse h-24"
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-6">
+      <h1 className="text-[22px] font-bold text-slate-900 mb-2">My Impact</h1>
+      <p className="text-[13px] text-slate-500 mb-8">
+        Your contribution to bridging the resource gap.
+      </p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
+        {isDonor && (
+          <>
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+              <p className="text-[36px] font-black text-blue-600">
+                {stats.posted}
+              </p>
+              <p className="text-[12px] font-semibold text-slate-600 mt-1">
+                Items Posted
+              </p>
+            </div>
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+              <p className="text-[36px] font-black text-green-600">
+                {stats.transferred}
+              </p>
+              <p className="text-[12px] font-semibold text-slate-600 mt-1">
+                Transferred
+              </p>
+            </div>
+            <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+              <p className="text-[36px] font-black text-amber-500">
+                {stats.available}
+              </p>
+              <p className="text-[12px] font-semibold text-slate-600 mt-1">
+                Still Available
+              </p>
+            </div>
+          </>
+        )}
+        {isRecipient && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
+            <p className="text-[36px] font-black text-blue-600">
+              {stats.claimed}
+            </p>
+            <p className="text-[12px] font-semibold text-slate-600 mt-1">
+              Items Claimed
+            </p>
+          </div>
+        )}
+      </div>
+      {isDonor && stats.transferred >= 3 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4">
+          <span className="text-3xl">🏆</span>
+          <div>
+            <p className="text-[14px] font-bold text-blue-800">
+              Trusted Donor Badge
+            </p>
+            <p className="text-[12px] text-blue-600">
+              You have completed {stats.transferred} verified transfers. Thank
+              you!
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Change Password Modal ────────────────────────────────────────────────────
 function ChangePasswordModal({ onClose }) {
   const [current, setCurrent] = useState("");
@@ -7088,12 +7320,6 @@ function EnterPinButton({ listing, user, onTransferred }) {
         headers: getHeaders(getToken()),
       });
       incrementDonorTransfers(listing.owner_email, getToken());
-      // Update the Units Transferred counter in localStorage directly
-      const qty = parseInt(listing.quantity) || 1;
-      const prev = parseInt(
-        localStorage.getItem("eq_transferred_count") || "0"
-      );
-      localStorage.setItem("eq_transferred_count", String(prev + qty));
       setShow(false);
       if (onTransferred) onTransferred(listing.id);
     } catch (err) {
@@ -7993,78 +8219,13 @@ function DashboardContent({
 
   // ── IMPACT ──
   if (view === "impact") {
-    const myDonated = allListings.filter(
-      (l) => l.owner_email === user?.email
-    ).length;
-    const myTransferred = allListings.filter(
-      (l) => l.owner_email === user?.email && l.status === "transferred"
-    ).length;
-    const myClaimed = claimedItems.length;
     return (
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        <h1 className="text-[22px] font-bold text-slate-900 mb-2">My Impact</h1>
-        <p className="text-[13px] text-slate-500 mb-8">
-          Your contribution to bridging the resource gap.
-        </p>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-8">
-          {isDonor && (
-            <>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-blue-600">
-                  {myDonated}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Items Posted
-                </p>
-              </div>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-green-600">
-                  {myTransferred}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Transferred
-                </p>
-              </div>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-amber-500">
-                  {myDonated - myTransferred > 0
-                    ? myDonated - myTransferred
-                    : 0}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Still Available
-                </p>
-              </div>
-            </>
-          )}
-          {isRecipient && (
-            <>
-              <div className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm text-center">
-                <p className="text-[36px] font-black text-blue-600">
-                  {myClaimed}
-                </p>
-                <p className="text-[12px] font-semibold text-slate-600 mt-1">
-                  Items Claimed
-                </p>
-              </div>
-            </>
-          )}
-        </div>
-        {isDonor && myTransferred >= 3 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex items-center gap-4">
-            <span className="text-3xl">🏆</span>
-            <div>
-              <p className="text-[14px] font-bold text-blue-800">
-                Trusted Donor Badge
-              </p>
-              <p className="text-[12px] text-blue-600">
-                You have completed {myTransferred} verified transfers. Thank
-                you!
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      <ImpactView
+        user={user}
+        isDonor={isDonor}
+        isRecipient={isRecipient}
+        refreshTrigger={refreshTrigger}
+      />
     );
   }
 
