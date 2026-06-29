@@ -956,8 +956,10 @@ function ChatWindow({ listing, user, onClose }) {
         );
         // Local message stays — no popup
       } else {
-        // Replace temp with confirmed server data
-        fetchMessages();
+        // Delayed fetch to avoid duplicate — optimistic message stays until poll confirms
+        setTimeout(() => {
+          if (isMounted.current) fetchMessages();
+        }, 800);
         if (receiverId && receiverId !== senderEmail) {
           // No notification for messages — badge handled by unread count only
           // Send email notification
@@ -3286,13 +3288,31 @@ function InlineChatBody({ listing, user }) {
           message_text: String(text),
         }),
       });
-      if (res.ok) fetchMsgs();
-      else {
+      if (!res.ok) {
         const e = await res.json().catch(() => ({}));
         console.error("MSG ERROR:", res.status, e);
+        // On failure, remove the optimistic message
+        setMessages((prev) =>
+          prev.filter(
+            (m) => m.message_text !== text || !String(m.id).startsWith("temp-")
+          )
+        );
+        setInput(text); // Restore input so user can retry
+      } else {
+        // Success — schedule a fetch slightly later to get the real ID
+        // This replaces the temp message cleanly without racing
+        setTimeout(() => {
+          if (isMounted.current) fetchMsgs();
+        }, 800);
       }
     } catch (err) {
       console.error("MSG SEND:", err.message);
+      setMessages((prev) =>
+        prev.filter(
+          (m) => m.message_text !== text || !String(m.id).startsWith("temp-")
+        )
+      );
+      setInput(text);
     } finally {
       setSending(false);
     }
@@ -6991,6 +7011,7 @@ function ImpactView({ user, isDonor, isRecipient, refreshTrigger }) {
     claimed: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [manualRefresh, setManualRefresh] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -7020,32 +7041,46 @@ function ImpactView({ user, isDonor, isRecipient, refreshTrigger }) {
             (Array.isArray(profileData) &&
               profileData[0]?.transfers_completed) ||
             0;
-          const available = Array.isArray(activeListings)
-            ? activeListings.filter((l) => l.status === "available").length
-            : 0;
-          const pending = Array.isArray(activeListings)
-            ? activeListings.filter(
-                (l) => l.status === "pending" || l.status === "claimed"
-              ).length
-            : 0;
-          // Total posted = active + transferred (deleted ones counted via profiles)
-          const posted =
-            (Array.isArray(activeListings) ? activeListings.length : 0) +
-            transferred;
+          const activeArr = Array.isArray(activeListings) ? activeListings : [];
+          const available = activeArr.filter(
+            (l) => l.status === "available"
+          ).length;
+          // Total posted = currently active listings + all completed transfers
+          const posted = activeArr.length + transferred;
           setStats({ posted, transferred, available, claimed: 0 });
         } else if (isRecipient) {
-          const res = await fetch(
-            `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(
-              user.email
-            )}&select=id,status`,
-            { headers: getHeaders(token) }
+          // Try both email and user.id as claimer_id (some records may use UUID)
+          const [resEmail, resId] = await Promise.all([
+            fetch(
+              `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(
+                user.email
+              )}&select=id,status`,
+              { headers: getHeaders(token) }
+            ),
+            user.id
+              ? fetch(
+                  `${SUPABASE_URL}/listings?claimer_id=eq.${encodeURIComponent(
+                    user.id
+                  )}&select=id,status`,
+                  { headers: getHeaders(token) }
+                )
+              : Promise.resolve(null),
+          ]);
+          const byEmail = resEmail.ok ? await resEmail.json() : [];
+          const byId = resId && resId.ok ? await resId.json() : [];
+          // Combine and deduplicate by id
+          const allClaimed = [
+            ...(Array.isArray(byEmail) ? byEmail : []),
+            ...(Array.isArray(byId) ? byId : []),
+          ];
+          const uniqueClaimed = allClaimed.filter(
+            (l, i, arr) => arr.findIndex((x) => x.id === l.id) === i
           );
-          const claimed = res.ok ? await res.json() : [];
           setStats({
             posted: 0,
             transferred: 0,
             available: 0,
-            claimed: Array.isArray(claimed) ? claimed.length : 0,
+            claimed: uniqueClaimed.length,
           });
         }
       } catch {
@@ -7054,7 +7089,7 @@ function ImpactView({ user, isDonor, isRecipient, refreshTrigger }) {
       }
     };
     fetchStats();
-  }, [user, isDonor, isRecipient, refreshTrigger]);
+  }, [user, isDonor, isRecipient, refreshTrigger, manualRefresh]);
 
   if (loading) {
     return (
@@ -7074,7 +7109,29 @@ function ImpactView({ user, isDonor, isRecipient, refreshTrigger }) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
-      <h1 className="text-[22px] font-bold text-slate-900 mb-2">My Impact</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-[22px] font-bold text-slate-900">My Impact</h1>
+        <button
+          onClick={() => setManualRefresh((n) => n + 1)}
+          className="text-[12px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1.5"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="w-3.5 h-3.5"
+          >
+            <path d="M23 4v6h-6M1 20v-6h6" />
+            <path
+              d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Refresh
+        </button>
+      </div>
       <p className="text-[13px] text-slate-500 mb-8">
         Your contribution to bridging the resource gap.
       </p>
@@ -7610,9 +7667,17 @@ function Dashboard({
         {/* User profile card */}
         <div className="px-4 py-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[14px] shrink-0">
-              {initials}
-            </div>
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt="Profile"
+                className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[14px] shrink-0">
+                {initials}
+              </div>
+            )}
             <div className="min-w-0">
               <p className="text-[13px] font-bold text-slate-900 truncate">
                 {user?.username || user?.org_name || "User"}
@@ -7781,6 +7846,8 @@ function DashboardContent({
     user?.username || ""
   );
   const [settingsOrgName, setSettingsOrgName] = useState(user?.org_name || "");
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar_url || "");
+  const [avatarUploading, setAvatarUploading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsSuccess, setSettingsSuccess] = useState("");
   const [settingsError, setSettingsError] = useState("");
@@ -7859,6 +7926,73 @@ function DashboardContent({
       setSettingsError(err.message);
     } finally {
       setSettingsSaving(false);
+    }
+  };
+
+  const uploadAvatar = async (file) => {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Image must be under 5MB.");
+      return;
+    }
+    const ext = file.name.split(".").pop().toLowerCase();
+    if (!["jpg", "jpeg", "png", "webp"].includes(ext)) {
+      alert("Only JPG, PNG or WebP allowed.");
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const filename = `avatar-${(user?.id || user?.email || "user").replace(
+        /[^a-z0-9]/gi,
+        ""
+      )}-${Date.now()}.${ext}`;
+      const res = await fetch(
+        `${SUPABASE_STORAGE}/object/profile-photos/${filename}`,
+        {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": file.type,
+          },
+          body: file,
+        }
+      );
+      if (!res.ok)
+        throw new Error(
+          "Upload failed. Make sure 'profile-photos' bucket exists in Supabase Storage."
+        );
+      const url = `${SUPABASE_STORAGE}/object/public/profile-photos/${filename}`;
+      setAvatarUrl(url);
+      const metaRes = await fetch(`${AUTH_URL}/user`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          data: {
+            username: user?.username || "",
+            org_name: user?.org_name || "",
+            account_type: user?.account_type || "",
+            phone: user?.phone || "",
+            region: user?.region || "",
+            email: user?.email || "",
+            institution_domain: user?.institution_domain || "",
+            tax_id: user?.tax_id || "",
+            avatar_url: url,
+          },
+        }),
+      });
+      if (metaRes.ok) {
+        const updated = { ...user, avatar_url: url };
+        localStorage.setItem("eq_user", JSON.stringify(updated));
+      }
+    } catch (err) {
+      alert(err.message || "Failed to upload photo.");
+    } finally {
+      setAvatarUploading(false);
     }
   };
 
@@ -8242,6 +8376,59 @@ function DashboardContent({
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-4">
           <h2 className="text-[15px] font-bold text-slate-800 mb-4">Profile</h2>
           <div className="space-y-4">
+            {/* Profile picture */}
+            <div className="flex items-center gap-4">
+              <div className="relative shrink-0">
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="Profile"
+                    className="w-16 h-16 rounded-full object-cover border-2 border-slate-200"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[20px]">
+                    {(user?.username || user?.email || "U")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                )}
+                {avatarUploading && (
+                  <div className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center">
+                    <IconLoader />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="cursor-pointer inline-flex items-center gap-2 text-[13px] font-semibold text-blue-600 hover:text-blue-700 border border-blue-200 hover:border-blue-300 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded-xl transition-all">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    className="w-3.5 h-3.5"
+                  >
+                    <path
+                      d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {avatarUploading ? "Uploading…" : "Change Photo"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) uploadAvatar(e.target.files[0]);
+                    }}
+                    disabled={avatarUploading}
+                  />
+                </label>
+                <p className="text-[11px] text-slate-400 mt-1">
+                  JPG, PNG or WebP · Max 5MB
+                </p>
+              </div>
+            </div>
             <div>
               <label className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
                 Display Name
