@@ -3002,6 +3002,16 @@ function InboxModal({
 
   // ── If a listing is selected, show inline full chat ──
   if (activeListing) {
+    const otherName = activeListing._otherName || "User";
+    const otherInitials = otherName.slice(0, 2).toUpperCase();
+    const otherColor = [
+      "bg-purple-500",
+      "bg-green-500",
+      "bg-amber-500",
+      "bg-rose-500",
+      "bg-teal-500",
+      "bg-indigo-500",
+    ][otherName.charCodeAt(0) % 6];
     return (
       <div className="flex flex-col h-full min-h-0 flex-1">
         {/* Chat header */}
@@ -3025,20 +3035,34 @@ function InboxModal({
             </svg>
           </button>
           <div
-            className={`w-9 h-9 rounded-full ${avatarColor(
-              activeListing._otherName
-            )} flex items-center justify-center text-white font-bold text-[13px] shrink-0`}
+            className={`w-9 h-9 rounded-full ${otherColor} flex items-center justify-center text-white font-bold text-[13px] shrink-0`}
           >
-            {initials(activeListing._otherName)}
+            {otherInitials}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-[14px] font-bold text-slate-900 truncate">
-              {activeListing._otherName}
+              {otherName}
             </p>
             <p className="text-[11px] text-slate-400 truncate">
               {activeListing.title}
             </p>
           </div>
+          {/* Current user's own photo in the top-right of the header */}
+          {user?.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt="You"
+              className="w-8 h-8 rounded-full object-cover border-2 border-blue-100 shrink-0"
+              title={user?.username || "You"}
+            />
+          ) : (
+            <div
+              className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[11px] shrink-0"
+              title={user?.username || "You"}
+            >
+              {(user?.username || user?.email || "U").slice(0, 2).toUpperCase()}
+            </div>
+          )}
         </div>
         {/* Inline chat body */}
         <InlineChatBody listing={activeListing} user={user} />
@@ -3099,64 +3123,83 @@ function InboxModal({
           </div>
         ) : (
           <div>
-            {threads.map(({ listing_id, last, unread, listing, otherName }) => (
-              <button
-                key={listing_id}
-                onClick={() => {
-                  // Open chat even if listing was deleted — create minimal object from thread data
-                  const l = listing
-                    ? { ...listing, _otherName: otherName }
-                    : {
-                        id: listing_id,
-                        title: last?.topic || "Conversation",
-                        owner_email: last?.receiver_id || "",
-                        _otherName: otherName,
-                      };
-                  setActiveListing(l);
-                }}
-                className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-50 text-left"
-              >
-                <div
-                  className={`w-12 h-12 rounded-full ${avatarColor(
-                    otherName
-                  )} flex items-center justify-center text-white font-bold text-[15px] shrink-0`}
+            {threads.map(({ listing_id, last, unread, listing, otherName }) => {
+              const tColor = [
+                "bg-purple-500",
+                "bg-green-500",
+                "bg-amber-500",
+                "bg-rose-500",
+                "bg-teal-500",
+                "bg-indigo-500",
+              ][(otherName || "U").charCodeAt(0) % 6];
+              return (
+                <button
+                  key={listing_id}
+                  onClick={() => {
+                    const l = listing
+                      ? { ...listing, _otherName: otherName }
+                      : {
+                          id: listing_id,
+                          title: last?.topic || "Conversation",
+                          owner_email: last?.receiver_id || "",
+                          _otherName: otherName,
+                        };
+                    setActiveListing(l);
+                  }}
+                  className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors border-b border-slate-50 text-left"
                 >
-                  {initials(otherName)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <div
+                    className={`w-12 h-12 rounded-full ${tColor} flex items-center justify-center text-white font-bold text-[15px] shrink-0`}
+                  >
+                    {(otherName || "U").slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <p
+                        className={`text-[14px] truncate ${
+                          unread > 0
+                            ? "font-bold text-slate-900"
+                            : "font-semibold text-slate-700"
+                        }`}
+                      >
+                        {otherName}
+                      </p>
+                      <p className="text-[11px] text-slate-400 shrink-0">
+                        {timeAgo(last?.created_at)}
+                      </p>
+                    </div>
                     <p
-                      className={`text-[14px] truncate ${
+                      className={`text-[13px] truncate ${
                         unread > 0
-                          ? "font-bold text-slate-900"
-                          : "font-semibold text-slate-700"
+                          ? "font-semibold text-slate-800"
+                          : "text-slate-400"
                       }`}
                     >
-                      {otherName}
+                      {last?.sender_email === user.email ? (
+                        <span className="flex items-center gap-1">
+                          {user?.avatar_url ? (
+                            <img
+                              src={user.avatar_url}
+                              className="w-4 h-4 rounded-full object-cover inline shrink-0"
+                              alt=""
+                            />
+                          ) : null}
+                          You: {last?.message_text || ""}
+                        </span>
+                      ) : (
+                        last?.message_text || ""
+                      )}
                     </p>
-                    <p className="text-[11px] text-slate-400 shrink-0">
-                      {timeAgo(last?.created_at)}
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      {listing?.title || "Listing"}
                     </p>
                   </div>
-                  <p
-                    className={`text-[13px] truncate ${
-                      unread > 0
-                        ? "font-semibold text-slate-800"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    {last?.sender_email === user.email ? "You: " : ""}
-                    {last?.message_text || ""}
-                  </p>
-                  <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                    {listing?.title || "Listing"}
-                  </p>
-                </div>
-                {unread > 0 && (
-                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full shrink-0" />
-                )}
-              </button>
-            ))}
+                  {unread > 0 && (
+                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full shrink-0" />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -3311,7 +3354,7 @@ function InlineChatBody({ listing, user }) {
   return (
     <div className="flex flex-col flex-1 min-h-0 bg-slate-50 h-full">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
         {loading ? (
           <div className="flex justify-center py-10">
             <IconLoader />
@@ -3341,64 +3384,128 @@ function InlineChatBody({ listing, user }) {
             </p>
           </div>
         ) : (
-          messages.map((msg) => {
+          messages.map((msg, idx) => {
             const isMe =
               msg.sender_email === user?.email ||
               msg.sender_id === user?.id ||
               msg.sender_id === user?.email;
             const isTemp = String(msg.id).startsWith("temp-");
+            const prevMsg = messages[idx - 1];
+            const sameSenderAsPrev =
+              prevMsg && prevMsg.sender_email === msg.sender_email;
+
+            // Avatar for this message
+            const senderName = msg.sender_name || msg.sender_email || "User";
+            const avatarColors = [
+              "bg-purple-500",
+              "bg-green-500",
+              "bg-amber-500",
+              "bg-rose-500",
+              "bg-teal-500",
+              "bg-indigo-500",
+            ];
+            const otherAvatarColor =
+              avatarColors[senderName.charCodeAt(0) % avatarColors.length];
+            const myAvatarUrl = user?.avatar_url;
+            const myInitials = (
+              user?.username ||
+              user?.org_name ||
+              user?.email ||
+              "U"
+            )
+              .slice(0, 2)
+              .toUpperCase();
+            const otherInitials = senderName.slice(0, 2).toUpperCase();
+
             return (
               <div
                 key={msg.id}
-                className={`flex flex-col ${
-                  isMe ? "items-end" : "items-start"
-                }`}
+                className={`flex items-end gap-2 ${
+                  isMe ? "flex-row-reverse" : "flex-row"
+                } ${sameSenderAsPrev ? "mt-0.5" : "mt-3"}`}
               >
-                {!isMe && (
-                  <p className="text-[10px] font-semibold text-slate-500 mb-1 px-1">
-                    {msg.sender_name || "User"}
-                  </p>
-                )}
+                {/* Avatar — always visible, hidden when same sender as previous */}
+                <div className="shrink-0 w-8 h-8">
+                  {!sameSenderAsPrev &&
+                    (isMe ? (
+                      myAvatarUrl ? (
+                        <img
+                          src={myAvatarUrl}
+                          alt="You"
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[11px] shadow-sm">
+                          {myInitials}
+                        </div>
+                      )
+                    ) : (
+                      <div
+                        className={`w-8 h-8 rounded-full ${otherAvatarColor} flex items-center justify-center text-white font-bold text-[11px] shadow-sm`}
+                      >
+                        {otherInitials}
+                      </div>
+                    ))}
+                </div>
+
+                {/* Bubble + name */}
                 <div
-                  className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${
-                    isMe
-                      ? "bg-blue-600 text-white rounded-br-sm"
-                      : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm shadow-sm"
-                  } ${isTemp ? "opacity-60" : ""}`}
+                  className={`flex flex-col max-w-[72%] ${
+                    isMe ? "items-end" : "items-start"
+                  }`}
                 >
-                  <p className="break-words whitespace-pre-wrap">
-                    {msg.message_text || msg.body || msg.text || ""}
-                  </p>
-                  <div
-                    className={`flex items-center gap-1 mt-1 ${
-                      isMe ? "justify-end" : "justify-start"
-                    }`}
-                  >
+                  {!sameSenderAsPrev && (
                     <p
-                      className={`text-[10px] ${
-                        isMe ? "text-blue-200" : "text-slate-400"
+                      className={`text-[11px] font-semibold mb-1 px-1 ${
+                        isMe ? "text-blue-400 text-right" : "text-slate-500"
                       }`}
                     >
-                      {isTemp
-                        ? "sending…"
-                        : new Date(msg.created_at).toLocaleTimeString([], {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
+                      {isMe
+                        ? user?.username || user?.org_name || "You"
+                        : senderName}
                     </p>
-                    {isMe && !isTemp && (
-                      <span className="text-[11px] leading-none">
-                        {msg.read_by && msg.read_by.length > 0 ? (
-                          <span className="text-blue-300" title="Seen">
-                            ✓✓
-                          </span>
-                        ) : (
-                          <span className="text-blue-200" title="Delivered">
-                            ✓
-                          </span>
-                        )}
-                      </span>
-                    )}
+                  )}
+                  <div
+                    className={`px-4 py-2.5 rounded-2xl text-[14px] leading-relaxed ${
+                      isMe
+                        ? "bg-blue-600 text-white rounded-br-sm"
+                        : "bg-white border border-slate-100 text-slate-800 rounded-bl-sm shadow-sm"
+                    } ${isTemp ? "opacity-60" : ""}`}
+                  >
+                    <p className="break-words whitespace-pre-wrap">
+                      {msg.message_text || msg.body || msg.text || ""}
+                    </p>
+                    <div
+                      className={`flex items-center gap-1 mt-1 ${
+                        isMe ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <p
+                        className={`text-[10px] ${
+                          isMe ? "text-blue-200" : "text-slate-400"
+                        }`}
+                      >
+                        {isTemp
+                          ? "sending…"
+                          : new Date(msg.created_at).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                      </p>
+                      {isMe && !isTemp && (
+                        <span className="text-[11px] leading-none">
+                          {msg.read_by && msg.read_by.length > 0 ? (
+                            <span className="text-blue-300" title="Seen">
+                              ✓✓
+                            </span>
+                          ) : (
+                            <span className="text-blue-200" title="Delivered">
+                              ✓
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -7534,6 +7641,7 @@ function Dashboard({
   const initials = (user?.username || user?.org_name || user?.email || "U")
     .slice(0, 2)
     .toUpperCase();
+  const [showLandingPreview, setShowLandingPreview] = useState(false);
 
   const navItems = [
     {
@@ -7760,6 +7868,29 @@ function Dashboard({
           </div>
         )}
 
+        {/* View Public Site */}
+        <div className="px-4 pb-2">
+          <button
+            onClick={() => setShowLandingPreview(true)}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-[13px] font-medium text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-all"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-4 h-4"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path
+                d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"
+                strokeLinecap="round"
+              />
+            </svg>
+            View Public Site
+          </button>
+        </div>
+
         {/* Sign out */}
         <div className="px-4 pb-5 border-t border-slate-100 pt-3">
           <button
@@ -7789,6 +7920,55 @@ function Dashboard({
           </button>
         </div>
       </aside>
+
+      {/* ── LANDING PAGE PREVIEW OVERLAY ── */}
+      {showLandingPreview && (
+        <div className="fixed inset-0 z-[200] bg-white overflow-y-auto">
+          {/* Sticky close bar */}
+          <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-100 flex items-center justify-between px-5 py-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-[16px] font-black text-blue-600 tracking-tight">
+                Equilinkz
+              </span>
+              <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-medium">
+                Public View
+              </span>
+            </div>
+            <button
+              onClick={() => setShowLandingPreview(false)}
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-700 text-white text-[13px] font-semibold px-4 py-2 rounded-xl transition-all"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className="w-3.5 h-3.5"
+              >
+                <path
+                  d="M19 12H5M12 5l-7 7 7 7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              Back to Dashboard
+            </button>
+          </div>
+          {/* Landing page content */}
+          <Hero
+            onBrowse={() => setShowLandingPreview(false)}
+            onDonate={() => setShowLandingPreview(false)}
+          />
+          <HowItWorksSection
+            onBrowse={() => setShowLandingPreview(false)}
+            onDonate={() => setShowLandingPreview(false)}
+            onAuth={() => setShowLandingPreview(false)}
+            user={user}
+          />
+          <ImpactSection />
+          <Footer onPrivacy={() => {}} />
+        </div>
+      )}
 
       {/* ── MAIN CONTENT ── */}
       <main className="flex-1 md:ml-64 pb-20 md:pb-0 min-h-screen">
