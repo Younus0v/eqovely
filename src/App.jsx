@@ -765,24 +765,12 @@ function ChatWindow({ listing, user, onClose }) {
       if (!res.ok || !isMounted.current) return;
       const data = await res.json();
       if (!Array.isArray(data)) return;
-      // Merge: keep optimistic messages not yet confirmed by server.
-      // A temp message counts as "confirmed" (and is dropped) once a server
-      // message exists with the same sender + text — the server always
-      // assigns a brand-new id, so matching by id alone left the dim
-      // "sending…" placeholder stuck next to the real message forever.
       setMessages((prev) => {
-        const serverIds = new Set(data.map((m) => String(m.id)));
-        const pendingOptimistic = prev.filter((m) => {
-          if (!String(m.id).startsWith("temp-")) return false;
-          if (serverIds.has(String(m.id))) return false;
-          const confirmed = data.some(
-            (sm) =>
-              sm.sender_email === m.sender_email &&
-              sm.message_text === m.message_text
-          );
-          return !confirmed;
-        });
-        return [...data, ...pendingOptimistic];
+        // Belt-and-suspenders: drop ALL temp messages whenever fresh server
+        // data arrives. The send() function now swaps temp → real immediately
+        // on success, so any surviving temp is either a failed send (already
+        // removed) or a stale ghost from a previous session — either way, gone.
+        return data;
       });
       setLastCount(data.length);
     } catch (_) {
@@ -927,7 +915,9 @@ function ChatWindow({ listing, user, onClose }) {
     }
     const tempId = "temp-" + Date.now();
 
-    // STEP 1 — Add to local state INSTANTLY, before any network call
+    // STEP 1 — Add a local placeholder only as a fallback if DB returns no record.
+    // We immediately swap it for the real saved record on success, so it
+    // should almost never be visible. If the DB save fails we remove it.
     const localMsg = {
       id: tempId,
       listing_id: String(listing.id),
@@ -940,12 +930,7 @@ function ChatWindow({ listing, user, onClose }) {
     };
     setMessages((prev) => [...prev, localMsg]);
 
-    // STEP 2 — Save to DB; swap the temp message for the real saved record
-    // the moment the response comes back. Using Prefer: return=representation
-    // so Supabase returns the full saved row (with its real DB id).
-    // Once the real message is in state with a real id, the WebSocket INSERT
-    // handler sees `prev.some(m => m.id === newMsg.id)` → true and skips it,
-    // and fetchMessages() has no temp to carry over either. No race, no duplicate.
+    // STEP 2 — Save to DB and immediately replace the placeholder
     try {
       const msgHeaders = getHeaders(getToken());
       msgHeaders["Prefer"] = "return=representation";
@@ -965,12 +950,13 @@ function ChatWindow({ listing, user, onClose }) {
         const saved = await res.json();
         const savedMsg = Array.isArray(saved) ? saved[0] : saved;
         if (savedMsg?.id) {
-          // Swap the temp placeholder for the real saved record immediately
+          // Replace placeholder with real record — WebSocket / polling won't
+          // add it again because they check `m.id === newMsg.id` first.
           setMessages((prev) =>
             prev.map((m) => (String(m.id) === tempId ? { ...savedMsg } : m))
           );
         } else {
-          // Fallback: just refetch if response had no record
+          // Supabase didn't return representation — refetch to clear placeholder
           if (isMounted.current) fetchMessages();
         }
         if (receiverId && receiverId !== senderEmail) {
@@ -998,7 +984,9 @@ function ChatWindow({ listing, user, onClose }) {
           res.status,
           e.message || e.hint || e.code || e
         );
-        // Keep the temp message visible — don't remove it so the user can retry
+        // Remove the placeholder on failure so it doesn't get stuck
+        setMessages((prev) => prev.filter((m) => String(m.id) !== tempId));
+        setInput(text); // Restore so user can retry
       }
     } catch (err) {
       console.error("CHAT NETWORK ERROR:", err.message);
@@ -2000,6 +1988,7 @@ function AuthModal({ onClose, onSuccess }) {
           institution_domain:
             m.institution_domain || storedUser.institution_domain || "",
           tax_id: m.tax_id || storedUser.tax_id || "",
+          avatar_url: m.avatar_url || storedUser.avatar_url || "",
         };
         localStorage.setItem("eq_token", data.access_token);
         if (data.refresh_token)
@@ -3225,15 +3214,10 @@ function InlineChatBody({ listing, user }) {
       if (!res.ok || !isMounted.current) return;
       const data = await res.json();
       if (Array.isArray(data) && isMounted.current) {
-        // Merge: keep any optimistic (temp-) messages not yet in server data
-        setMessages((prev) => {
-          const serverIds = new Set(data.map((m) => String(m.id)));
-          const pendingOptimistic = prev.filter(
-            (m) =>
-              String(m.id).startsWith("temp-") && !serverIds.has(String(m.id))
-          );
-          return [...data, ...pendingOptimistic];
-        });
+        // Drop all temp messages when fresh server data arrives.
+        // send() now adds the real saved record directly, so no temp should
+        // survive. Any that do are stale ghosts — clear them.
+        setMessages(data);
         // Mark received messages as read
         const unread = data.filter(
           (m) =>
@@ -3274,20 +3258,6 @@ function InlineChatBody({ listing, user }) {
         .find((m) => m.sender_email && m.sender_email !== user.email);
       receiverId = otherMsg?.sender_email || otherMsg?.sender_id || senderId;
     }
-    // Optimistic update
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: "temp-" + Date.now(),
-        listing_id: String(listing.id),
-        sender_id: senderId,
-        sender_email: senderEmail,
-        sender_name: senderName,
-        receiver_id: receiverId,
-        message_text: text,
-        created_at: new Date().toISOString(),
-      },
-    ]);
     try {
       const h = getHeaders(getToken());
       h["Prefer"] = "return=representation";
@@ -3303,30 +3273,28 @@ function InlineChatBody({ listing, user }) {
           message_text: String(text),
         }),
       });
-      if (!res.ok) {
+      if (res.ok) {
+        const saved = await res.json();
+        const savedMsg = Array.isArray(saved) ? saved[0] : saved;
+        if (savedMsg?.id) {
+          // Add the real saved record directly — no temp message, no dedup needed,
+          // no race with polling. The polling's fetchMsgs will see it by ID and skip it.
+          setMessages((prev) => {
+            if (prev.some((m) => String(m.id) === String(savedMsg.id)))
+              return prev;
+            return [...prev, savedMsg];
+          });
+        } else {
+          // Supabase didn't return representation — fall back to a fresh fetch
+          if (isMounted.current) fetchMsgs();
+        }
+      } else {
         const e = await res.json().catch(() => ({}));
         console.error("MSG ERROR:", res.status, e);
-        // On failure, remove the optimistic message
-        setMessages((prev) =>
-          prev.filter(
-            (m) => m.message_text !== text || !String(m.id).startsWith("temp-")
-          )
-        );
-        setInput(text); // Restore input so user can retry
-      } else {
-        // Success — schedule a fetch slightly later to get the real ID
-        // This replaces the temp message cleanly without racing
-        setTimeout(() => {
-          if (isMounted.current) fetchMsgs();
-        }, 800);
+        setInput(text); // Restore so user can retry
       }
     } catch (err) {
       console.error("MSG SEND:", err.message);
-      setMessages((prev) =>
-        prev.filter(
-          (m) => m.message_text !== text || !String(m.id).startsWith("temp-")
-        )
-      );
       setInput(text);
     } finally {
       setSending(false);
@@ -5618,7 +5586,9 @@ function ListingsSection({
               Latest Surplus
             </h2>
             <p className="text-slate-500 text-[13px] mt-1">
-              Showing 3 of {listings.length} available items
+              Showing 3 of{" "}
+              {listings.filter((l) => l.status === "available").length}{" "}
+              available items
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -8946,6 +8916,7 @@ export default function App() {
                   institution_domain:
                     m.institution_domain || storedUser.institution_domain || "",
                   tax_id: m.tax_id || storedUser.tax_id || "",
+                  avatar_url: m.avatar_url || storedUser.avatar_url || "",
                 };
                 localStorage.setItem("eq_user", JSON.stringify(refreshedUser));
               }
