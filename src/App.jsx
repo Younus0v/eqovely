@@ -765,13 +765,23 @@ function ChatWindow({ listing, user, onClose }) {
       if (!res.ok || !isMounted.current) return;
       const data = await res.json();
       if (!Array.isArray(data)) return;
-      // Merge: keep optimistic messages not yet confirmed by server
+      // Merge: keep optimistic messages not yet confirmed by server.
+      // A temp message counts as "confirmed" (and is dropped) once a server
+      // message exists with the same sender + text — the server always
+      // assigns a brand-new id, so matching by id alone left the dim
+      // "sending…" placeholder stuck next to the real message forever.
       setMessages((prev) => {
         const serverIds = new Set(data.map((m) => String(m.id)));
-        const pendingOptimistic = prev.filter(
-          (m) =>
-            String(m.id).startsWith("temp-") && !serverIds.has(String(m.id))
-        );
+        const pendingOptimistic = prev.filter((m) => {
+          if (!String(m.id).startsWith("temp-")) return false;
+          if (serverIds.has(String(m.id))) return false;
+          const confirmed = data.some(
+            (sm) =>
+              sm.sender_email === m.sender_email &&
+              sm.message_text === m.message_text
+          );
+          return !confirmed;
+        });
         return [...data, ...pendingOptimistic];
       });
       setLastCount(data.length);
@@ -2520,19 +2530,17 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
     setLoading(true);
     setError(null);
     try {
-      // First update status to "transferred" so it's never stuck in pending
-      await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
+      // Mark as transferred — the row is KEPT (not deleted). Deleting it used
+      // to wipe out the history that "Items Claimed", "Units Transferred",
+      // and the Impact report all depend on. It's hidden from active
+      // marketplace browsing separately, but stays in the database for stats.
+      const res = await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
         method: "PATCH",
         headers: getHeaders(getToken()),
         body: JSON.stringify({ status: "transferred" }),
       });
-      // Then delete listing completely on transfer
-      const res = await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
-        method: "DELETE",
-        headers: getHeaders(getToken()),
-      });
-      // Whether delete succeeded or not, we mark as transferred and move on
-      // The PATCH above already set status to "transferred" so nothing is stuck
+      if (!res.ok)
+        throw new Error("Could not complete the transfer. Please try again.");
       setSuccess(true);
       createNotification(
         listing.claimer_id,
@@ -2540,8 +2548,6 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
         `Transfer of "${listing.title}" is complete. Thank you for using Equilinkz!`,
         listing.id
       );
-      // Increment donor's transfer count for verified badge
-      incrementDonorTransfers(listing.owner_email, getToken());
       setTimeout(() => {
         onVerified(listing.id);
         onClose();
@@ -3994,61 +4000,6 @@ function Hero({ onBrowse, onDonate }) {
 // No-op — units transferred is now counted directly from transferred listings
 function incrementUnitsTransferred() {}
 
-// ─── Donor Transfer Counter ───────────────────────────────────────────────────
-async function incrementDonorTransfers(ownerEmail, token) {
-  if (!ownerEmail) return;
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
-        ownerEmail
-      )}&select=transfers_completed`,
-      { headers: getHeaders(token) }
-    );
-    const data = res.ok ? await res.json() : [];
-    const current = (Array.isArray(data) && data[0]?.transfers_completed) || 0;
-    if (Array.isArray(data) && data.length > 0) {
-      await fetch(
-        `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(ownerEmail)}`,
-        {
-          method: "PATCH",
-          headers: getHeaders(token),
-          body: JSON.stringify({ transfers_completed: current + 1 }),
-        }
-      );
-    } else {
-      // Profile row missing — insert it
-      await fetch(`${SUPABASE_URL}/profiles`, {
-        method: "POST",
-        headers: getHeaders(token),
-        body: JSON.stringify({
-          email: ownerEmail,
-          transfers_completed: 1,
-          username: "",
-        }),
-      });
-    }
-  } catch (e) {
-    console.error("incrementDonorTransfers error:", e.message);
-  }
-}
-
-async function fetchDonorTransferCount(ownerEmail) {
-  if (!ownerEmail) return 0;
-  try {
-    const res = await fetch(
-      `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
-        ownerEmail
-      )}&select=transfers_completed`,
-      { headers: getHeaders(null) }
-    );
-    if (!res.ok) return 0;
-    const data = await res.json();
-    return (Array.isArray(data) && data[0]?.transfers_completed) || 0;
-  } catch {
-    return 0;
-  }
-}
-
 function AnalyticsBar({ listings, transferredCount }) {
   return (
     <div className="grid grid-cols-2 gap-3 mb-8">
@@ -4263,7 +4214,8 @@ function ListingCard({
 
   const handleDelete = async () => {
     if (!user || user.email !== listing.owner_email) {
-      alert("Security: you are not the owner of this listing.");
+      if (onToast)
+        onToast("Security: you are not the owner of this listing.", "error");
       return;
     }
     // Confirmation already shown via modal — proceed with delete
@@ -4281,7 +4233,7 @@ function ListingCard({
       if (!res.ok) throw new Error("Delete failed — you may not be the owner.");
       onDelete(listing.id);
     } catch (err) {
-      alert(err.message || "Failed to delete.");
+      if (onToast) onToast(err.message || "Failed to delete.", "error");
     } finally {
       setDeleting(false);
     }
@@ -4290,9 +4242,11 @@ function ListingCard({
   const handleClaim = async (reason = "") => {
     if (isDone || !user) return;
     if (!checkClaimThrottle(listing.id)) {
-      alert(
-        "You have already claimed this item. Please wait before trying again."
-      );
+      if (onToast)
+        onToast(
+          "You have already claimed this item. Please wait before trying again.",
+          "error"
+        );
       return;
     }
     if (listing.category === "Medical Supplies" && !reason) {
@@ -4390,7 +4344,7 @@ function ListingCard({
       });
       setFlagged(!flagged);
     } catch {
-      alert("Failed to report.");
+      if (onToast) onToast("Failed to report.", "error");
     }
   };
 
@@ -5094,13 +5048,15 @@ function ListingsSection({
   const [pinData, setPinData] = useState(null); // {pin, listing}
   const [transferredCount, setTransferredCount] = useState(0);
 
-  // Fetch global Units Transferred from profiles table — same number for all users
+  // Fetch global Units Transferred directly from the listings table
+  // (status = 'transferred'). This is computed straight from the same
+  // public table the marketplace already reads, so it can never silently
+  // fall out of sync with a separate counter.
   useEffect(() => {
     const fetchGlobalTransferred = async () => {
       try {
-        // Use anon key only — public read, no auth needed
         const res = await fetch(
-          `${SUPABASE_URL}/profiles?select=transfers_completed`,
+          `${SUPABASE_URL}/listings?status=eq.transferred&select=id`,
           {
             headers: {
               apikey: SUPABASE_ANON_KEY,
@@ -5110,13 +5066,7 @@ function ListingsSection({
         );
         if (!res.ok) return;
         const data = await res.json();
-        if (Array.isArray(data)) {
-          const total = data.reduce(
-            (sum, p) => sum + (parseInt(p.transfers_completed) || 0),
-            0
-          );
-          setTransferredCount(total);
-        }
+        if (Array.isArray(data)) setTransferredCount(data.length);
       } catch {}
     };
     fetchGlobalTransferred();
@@ -5203,9 +5153,9 @@ function ListingsSection({
   };
   const handleTransferred = (id) => {
     setListings((p) => p.filter((l) => String(l.id) !== String(id)));
-    // Re-fetch global transferred count from DB after a short delay
+    // Re-fetch global transferred count from listings after a short delay
     setTimeout(() => {
-      fetch(`${SUPABASE_URL}/profiles?select=transfers_completed`, {
+      fetch(`${SUPABASE_URL}/listings?status=eq.transferred&select=id`, {
         headers: {
           apikey: SUPABASE_ANON_KEY,
           "Content-Type": "application/json",
@@ -5213,13 +5163,7 @@ function ListingsSection({
       })
         .then((r) => r.json())
         .then((data) => {
-          if (Array.isArray(data)) {
-            const total = data.reduce(
-              (sum, p) => sum + (parseInt(p.transfers_completed) || 0),
-              0
-            );
-            setTransferredCount(total);
-          }
+          if (Array.isArray(data)) setTransferredCount(data.length);
         })
         .catch(() => {});
     }, 1000);
@@ -5244,6 +5188,14 @@ function ListingsSection({
 
   // ── Base filter pipeline (used by both views) ─────────────────────────────
   let filtered = listings;
+  // Transferred listings now stay in the database (for accurate stats/
+  // history) instead of being deleted, so hide them from the open
+  // "browse everything" marketplace tab to keep it uncluttered. They still
+  // show normally in My Listings / Claimed Items / My Claims, which already
+  // filter by owner/claimer rather than by tab.
+  if (tab === "marketplace") {
+    filtered = filtered.filter((l) => l.status !== "transferred");
+  }
   if (tab === "dashboard" && user) {
     if (isDonor) {
       filtered = filtered.filter(
@@ -6072,24 +6024,24 @@ function FormSection({ onSuccess, user }) {
     "block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide";
 
   return (
-    <section id="list" className="py-24 bg-white">
-      <div className="max-w-2xl mx-auto px-6">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-600 rounded-2xl shadow-lg shadow-blue-200 mb-5 text-white">
-            <IconPlus />
-          </div>
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">
-            List Your Surplus
-          </h2>
-          <p className="text-slate-500 text-[14px] max-w-md mx-auto leading-relaxed">
-            {user
-              ? `Listing as ${user.username || user.org_name || user.email} · ${
-                  user.account_type
-                }`
-              : "Sign in to publish a listing and connect with recipients globally."}
-          </p>
-        </div>
+    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+      <div className="lg:col-span-3">
         <div className="bg-white border border-slate-100 rounded-3xl shadow-xl shadow-slate-100 p-8">
+          <div className="mb-6">
+            <p className="text-[13px] text-slate-500">
+              {user ? (
+                <>
+                  Listing as{" "}
+                  <span className="font-semibold text-slate-700">
+                    {user.username || user.org_name || user.email}
+                  </span>{" "}
+                  · {user.account_type}
+                </>
+              ) : (
+                "Sign in to publish a listing and connect with recipients globally."
+              )}
+            </p>
+          </div>
           {success && (
             <div className="mb-6 flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
               <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white shrink-0">
@@ -6333,7 +6285,112 @@ function FormSection({ onSuccess, user }) {
           always.
         </p>
       </div>
-    </section>
+
+      {/* ── Sidebar: tips, what happens next, trust badge ── */}
+      <div className="lg:col-span-2 space-y-4">
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center text-[14px]">
+              💡
+            </span>
+            Tips for a great listing
+          </h3>
+          <ul className="space-y-3 text-[13px] text-slate-600 leading-relaxed">
+            <li className="flex gap-2.5">
+              <span className="text-blue-500 font-bold shrink-0">1.</span>
+              Add clear photos in good lighting — listings with photos get
+              claimed up to 3x faster.
+            </li>
+            <li className="flex gap-2.5">
+              <span className="text-blue-500 font-bold shrink-0">2.</span>
+              Be specific in the title (e.g. "Dell Latitude 5420 Laptop" beats
+              "Laptop").
+            </li>
+            <li className="flex gap-2.5">
+              <span className="text-blue-500 font-bold shrink-0">3.</span>
+              Mention condition and quantity in the description so recipients
+              know exactly what to expect.
+            </li>
+            <li className="flex gap-2.5">
+              <span className="text-blue-500 font-bold shrink-0">4.</span>
+              Set an accurate pickup location so nearby recipients can find you
+              first.
+            </li>
+          </ul>
+        </div>
+
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+          <h3 className="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <span className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center text-[14px]">
+              🚀
+            </span>
+            What happens after you post
+          </h3>
+          <div className="space-y-4">
+            {[
+              {
+                n: "1",
+                t: "Goes live instantly",
+                d: "Your item appears in the marketplace for recipients worldwide to browse.",
+              },
+              {
+                n: "2",
+                t: "A recipient claims it",
+                d: "You'll get a notification and can message them to arrange pickup.",
+              },
+              {
+                n: "3",
+                t: "Verify with a PIN",
+                d: "A secure 4-digit PIN confirms the handoff so nothing gets lost in transit.",
+              },
+              {
+                n: "4",
+                t: "Track your impact",
+                d: "Completed transfers count toward your Impact stats and Trusted Donor badge.",
+              },
+            ].map((step) => (
+              <div key={step.n} className="flex gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  {step.n}
+                </div>
+                <div>
+                  <p className="text-[13px] font-semibold text-slate-800">
+                    {step.t}
+                  </p>
+                  <p className="text-[12px] text-slate-500 leading-relaxed">
+                    {step.d}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 shadow-sm text-white">
+          <div className="flex items-center gap-2 mb-2">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className="w-5 h-5"
+            >
+              <path
+                d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <h3 className="text-[14px] font-bold">Secure handoffs, always</h3>
+          </div>
+          <p className="text-[12px] text-blue-100 leading-relaxed">
+            Every transfer on Equilinkz is confirmed with a private PIN
+            exchanged only between you and the recipient — nothing is marked
+            transferred until you both verify it in person.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -7020,33 +7077,24 @@ function ImpactView({ user, isDonor, isRecipient, refreshTrigger }) {
       try {
         const token = getToken();
         if (isDonor) {
-          // Fetch all listings by this user (including historical via profiles)
-          const [activeRes, profileRes] = await Promise.all([
-            fetch(
-              `${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(
-                user.email
-              )}&select=id,status`,
-              { headers: getHeaders(token) }
-            ),
-            fetch(
-              `${SUPABASE_URL}/profiles?email=eq.${encodeURIComponent(
-                user.email
-              )}&select=transfers_completed`,
-              { headers: getHeaders(token) }
-            ),
-          ]);
-          const activeListings = activeRes.ok ? await activeRes.json() : [];
-          const profileData = profileRes.ok ? await profileRes.json() : [];
-          const transferred =
-            (Array.isArray(profileData) &&
-              profileData[0]?.transfers_completed) ||
-            0;
-          const activeArr = Array.isArray(activeListings) ? activeListings : [];
-          const available = activeArr.filter(
-            (l) => l.status === "available"
+          // Fetch all listings ever posted by this user — every status,
+          // including 'transferred', since those rows now persist instead
+          // of being deleted. One query gives us posted/transferred/
+          // available all at once, with nothing relying on a separate
+          // counter table that could fall out of sync.
+          const res = await fetch(
+            `${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(
+              user.email
+            )}&select=id,status`,
+            { headers: getHeaders(token) }
+          );
+          const all = res.ok ? await res.json() : [];
+          const arr = Array.isArray(all) ? all : [];
+          const transferred = arr.filter(
+            (l) => l.status === "transferred"
           ).length;
-          // Total posted = currently active listings + all completed transfers
-          const posted = activeArr.length + transferred;
+          const available = arr.filter((l) => l.status === "available").length;
+          const posted = arr.length;
           setStats({ posted, transferred, available, claimed: 0 });
         } else if (isRecipient) {
           // Try both email and user.id as claimer_id (some records may use UUID)
@@ -7365,18 +7413,16 @@ function EnterPinButton({ listing, user, onTransferred }) {
     }
     setSaving(true);
     try {
-      // Mark as transferred
-      await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
+      // Mark as transferred — keep the row (do NOT delete it). The previous
+      // delete-on-transfer was the reason "Units Transferred" and "Items
+      // Claimed" never worked: the row backing those stats vanished the
+      // moment a transfer completed.
+      const res = await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
         method: "PATCH",
         headers: getHeaders(getToken()),
         body: JSON.stringify({ status: "transferred" }),
       });
-      // Delete listing
-      await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
-        method: "DELETE",
-        headers: getHeaders(getToken()),
-      });
-      incrementDonorTransfers(listing.owner_email, getToken());
+      if (!res.ok) throw new Error("Transfer failed. Please try again.");
       setShow(false);
       if (onTransferred) onTransferred(listing.id);
     } catch (err) {
@@ -7496,6 +7542,7 @@ function Dashboard({
   onListingsLoaded,
   activeChatListing,
   onClearActiveChat,
+  onUserUpdate,
 }) {
   const DONOR_TYPES_D = ["Individual Donor", "Corporate/Lab Donor"];
   const RECIPIENT_TYPES_D = [
@@ -7781,6 +7828,7 @@ function Dashboard({
           onSignOut={onSignOut}
           activeChatListing={activeChatListing}
           onClearActiveChat={onClearActiveChat}
+          onUserUpdate={onUserUpdate}
         />
       </main>
 
@@ -7836,6 +7884,7 @@ function DashboardContent({
   onSignOut,
   activeChatListing,
   onClearActiveChat,
+  onUserUpdate,
 }) {
   const [myListings, setMyListings] = useState([]);
   const [claimedItems, setClaimedItems] = useState([]);
@@ -7852,6 +7901,7 @@ function DashboardContent({
   const [settingsSuccess, setSettingsSuccess] = useState("");
   const [settingsError, setSettingsError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const showToast = useToast();
 
   // Fetch MY listings (donor view)
   useEffect(() => {
@@ -7921,6 +7971,7 @@ function DashboardContent({
         org_name: settingsOrgName.trim(),
       };
       localStorage.setItem("eq_user", JSON.stringify(updated));
+      if (onUserUpdate) onUserUpdate(updated);
       setSettingsSuccess("Profile saved!");
     } catch (err) {
       setSettingsError(err.message);
@@ -7929,23 +7980,46 @@ function DashboardContent({
     }
   };
 
+  // Map common photo mime types to a safe file extension — relying on the
+  // browser-reported mime type (rather than the original filename) means
+  // photos straight from a phone camera/gallery (e.g. iPhone HEIC shots)
+  // are recognized correctly instead of silently failing.
+  const IMAGE_MIME_EXT = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "image/heif": "heic",
+    "image/gif": "gif",
+  };
+
   const uploadAvatar = async (file) => {
     if (!file) return;
+    if (!file.type || !file.type.startsWith("image/")) {
+      showToast("Please choose an image file.", "error");
+      return;
+    }
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image must be under 5MB.");
+      showToast("Image must be under 5MB.", "error");
       return;
     }
-    const ext = file.name.split(".").pop().toLowerCase();
-    if (!["jpg", "jpeg", "png", "webp"].includes(ext)) {
-      alert("Only JPG, PNG or WebP allowed.");
-      return;
-    }
+
+    // Show the photo instantly (from the local file) so picking it feels
+    // immediate, while the real upload finishes in the background.
+    const previousAvatar = avatarUrl;
+    const localPreview = URL.createObjectURL(file);
+    setAvatarUrl(localPreview);
     setAvatarUploading(true);
     try {
-      const filename = `avatar-${(user?.id || user?.email || "user").replace(
+      const ext =
+        IMAGE_MIME_EXT[file.type] ||
+        (file.name.split(".").pop() || "jpg").toLowerCase();
+      const safeId = (user?.id || user?.email || "user").replace(
         /[^a-z0-9]/gi,
         ""
-      )}-${Date.now()}.${ext}`;
+      );
+      const filename = `avatar-${safeId}-${Date.now()}.${ext}`;
       const res = await fetch(
         `${SUPABASE_STORAGE}/object/profile-photos/${filename}`,
         {
@@ -7960,10 +8034,9 @@ function DashboardContent({
       );
       if (!res.ok)
         throw new Error(
-          "Upload failed. Make sure 'profile-photos' bucket exists in Supabase Storage."
+          "Upload failed. Make sure the 'profile-photos' bucket exists and is public in Supabase Storage."
         );
       const url = `${SUPABASE_STORAGE}/object/public/profile-photos/${filename}`;
-      setAvatarUrl(url);
       const metaRes = await fetch(`${AUTH_URL}/user`, {
         method: "PUT",
         headers: {
@@ -7985,14 +8058,21 @@ function DashboardContent({
           },
         }),
       });
-      if (metaRes.ok) {
-        const updated = { ...user, avatar_url: url };
-        localStorage.setItem("eq_user", JSON.stringify(updated));
-      }
+      if (!metaRes.ok)
+        throw new Error(
+          "Photo uploaded but your profile couldn't be updated. Please try again."
+        );
+      setAvatarUrl(url);
+      const updated = { ...user, avatar_url: url };
+      localStorage.setItem("eq_user", JSON.stringify(updated));
+      if (onUserUpdate) onUserUpdate(updated); // updates sidebar/header instantly, everywhere
+      showToast("Profile photo updated!", "success");
     } catch (err) {
-      alert(err.message || "Failed to upload photo.");
+      setAvatarUrl(previousAvatar); // revert the instant preview on failure
+      showToast(err.message || "Failed to upload photo.", "error");
     } finally {
       setAvatarUploading(false);
+      URL.revokeObjectURL(localPreview);
     }
   };
 
@@ -8378,15 +8458,15 @@ function DashboardContent({
           <div className="space-y-4">
             {/* Profile picture */}
             <div className="flex items-center gap-4">
-              <div className="relative shrink-0">
+              <div className="relative shrink-0 group">
                 {avatarUrl ? (
                   <img
                     src={avatarUrl}
                     alt="Profile"
-                    className="w-16 h-16 rounded-full object-cover border-2 border-slate-200"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-slate-200 shadow-sm transition-all group-hover:border-blue-300"
                   />
                 ) : (
-                  <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[20px]">
+                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[24px] shadow-sm transition-all group-hover:from-blue-600 group-hover:to-blue-800">
                     {(user?.username || user?.email || "U")
                       .slice(0, 2)
                       .toUpperCase()}
@@ -8416,16 +8496,17 @@ function DashboardContent({
                   {avatarUploading ? "Uploading…" : "Change Photo"}
                   <input
                     type="file"
-                    accept="image/jpeg,image/png,image/webp"
+                    accept="image/*"
                     className="hidden"
                     onChange={(e) => {
                       if (e.target.files?.[0]) uploadAvatar(e.target.files[0]);
+                      e.target.value = "";
                     }}
                     disabled={avatarUploading}
                   />
                 </label>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  JPG, PNG or WebP · Max 5MB
+                  Take a photo or choose from your library · Max 5MB
                 </p>
               </div>
             </div>
@@ -8566,7 +8647,7 @@ function DashboardContent({
 // ─── FormSection inline (used inside dashboard post view) ────────────────────
 function FormSectionInline({ onSuccess, user }) {
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="w-full">
       <FormSection onSuccess={onSuccess} user={user} />
     </div>
   );
@@ -9045,6 +9126,7 @@ export default function App() {
             onListingsLoaded={setAllListings}
             activeChatListing={activeChatListing}
             onClearActiveChat={() => setActiveChatListing(null)}
+            onUserUpdate={setUser}
           />
         ) : (
           /* ── LOGGED OUT: Landing page ── */
