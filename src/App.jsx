@@ -10,11 +10,25 @@ import PrivacyModal from "./PrivacyModal";
 //  VITE_AUTH_URL=https://dwpqeuuqfbmbuqpuufup.supabase.co/auth/v1
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── Supabase Config (reads from .env in production) ─────────────────────────
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_STORAGE = import.meta.env.VITE_SUPABASE_STORAGE;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const AUTH_URL = import.meta.env.VITE_AUTH_URL;
+// ─── Supabase Config ─────────────────────────────────────────────────────────
+// Values are read from .env (VITE_* variables) when available, and fall back
+// to the hardcoded project values below — so the app works in VS Code or any
+// environment that doesn't have a .env file configured.
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ||
+  "https://dwpqeuuqfbmbuqpuufup.supabase.co/rest/v1";
+
+const SUPABASE_STORAGE =
+  import.meta.env.VITE_SUPABASE_STORAGE ||
+  "https://dwpqeuuqfbmbuqpuufup.supabase.co/storage/v1";
+
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR3cHFldXVxZmJtYnVxcHV1ZnVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMDY4MjIsImV4cCI6MjA5NDU4MjgyMn0.lzhbbl49fPMDc-YKzT2fxR1BL58eDOXgWo4T-HM2CBM";
+
+const AUTH_URL =
+  import.meta.env.VITE_AUTH_URL ||
+  "https://dwpqeuuqfbmbuqpuufup.supabase.co/auth/v1";
 
 const getHeaders = (token = null) => ({
   apikey: SUPABASE_ANON_KEY,
