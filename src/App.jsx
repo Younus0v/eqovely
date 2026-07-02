@@ -56,15 +56,20 @@ async function fetchUnreadCount(user) {
       localStorage.getItem("eq_msgs_seen_" + user.email) ||
       "1970-01-01T00:00:00Z";
     const receiverParam = encodeURIComponent(user.email);
+    // Fetch listing_id instead of id — we count distinct conversations,
+    // not individual messages. 5 messages from one chat = 1 badge dot, not 5.
     const res = await fetch(
       `${SUPABASE_URL}/messages?receiver_id=eq.${receiverParam}&created_at=gt.${encodeURIComponent(
         since
-      )}&select=id`,
+      )}&select=listing_id`,
       { headers: getHeaders(getToken()) }
     );
     if (!res.ok) return 0;
     const msgs = await res.json();
-    return Array.isArray(msgs) ? msgs.length : 0;
+    if (!Array.isArray(msgs) || msgs.length === 0) return 0;
+    // One badge count per unique conversation, not per message
+    const uniqueConversations = new Set(msgs.map(m => String(m.listing_id)));
+    return uniqueConversations.size;
   } catch {
     return 0;
   }
@@ -973,11 +978,11 @@ function ChatWindow({ listing, user, onClose }) {
         if (receiverId && receiverId !== senderEmail) {
           sendEmailNotification(
             receiverId,
-            `💬 New message about "${listing.title}" on Equilinkz`,
+            `New message about "${escapeHtml(listing.title)}" on Equilinkz`,
             `<div style="font-family:sans-serif;max-width:500px;margin:auto;padding:24px">
               <h2 style="color:#1d4ed8">Equilinkz — New Message</h2>
-              <p><strong>${senderName}</strong> sent you a message about <strong>${listing.title}</strong>:</p>
-              <blockquote style="border-left:3px solid #1d4ed8;padding-left:12px;color:#334155">${text.slice(0,200)}${text.length > 200 ? "..." : ""}</blockquote>
+              <p><strong>${escapeHtml(senderName)}</strong> sent you a message about <strong>${escapeHtml(listing.title)}</strong>:</p>
+              <blockquote style="border-left:3px solid #1d4ed8;padding-left:12px;color:#334155">${escapeHtml(text.slice(0,200))}${text.length > 200 ? "..." : ""}</blockquote>
               <p>Log in to Equilinkz to reply.</p>
               <p style="color:#64748b;font-size:13px">Founded by Younus Abdulkadir · Equilinkz Global Resource Marketplace</p>
             </div>`
@@ -1230,6 +1235,18 @@ async function sendEmailNotification(toEmail, subject, htmlBody) {
   } catch (err) {
     console.warn("Email notification failed:", err.message);
   }
+}
+
+// Escape user-provided text before embedding in HTML email bodies.
+// Without this, a username like <script>...</script> becomes a stored
+// XSS vector delivered to every recipient's email client.
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
@@ -1968,9 +1985,7 @@ function AuthModal({ onClose, onSuccess }) {
         let data = {};
         try { data = rawLoginText ? JSON.parse(rawLoginText) : {}; } catch { data = {}; }
         if (!res.ok)
-          throw new Error(
-            data.error_description || data.message || "Login failed"
-          );
+          throw new Error("Email or password is incorrect. Please try again.");
         const m = data.user?.user_metadata || {};
         // Read stored user to preserve account_type if metadata is missing
         let storedUser = {};
@@ -2916,9 +2931,11 @@ function InboxModal({ user, onClose, onOpenChat, allListings, inline, autoOpenLi
           ? last?.receiver_id
           : last?.sender_email;
         const otherName = messages.find(m => m.sender_email !== user.email)?.sender_name || otherEmail || "User";
-        const unread = messages.filter(m => m.sender_email !== user.email && !m.read_by?.includes(user.email)).length;
+        // unread = true/false per conversation — not a message count.
+        // The badge shows how many conversations have unread, not how many messages.
+        const hasUnread = messages.some(m => m.sender_email !== user.email && !m.read_by?.includes(user.email));
         const listing = (allListings || []).find(l => String(l.id) === lid);
-        return { listing_id: lid, last, unread, listing, otherName, otherEmail };
+        return { listing_id: lid, last, unread: hasUnread ? 1 : 0, listing, otherName, otherEmail };
       });
       setThreads(threadList);
     } catch (_) {}
@@ -3482,11 +3499,22 @@ function ToastProvider({ children }) {
   return (
     <ToastContext.Provider value={addToast}>
       {children}
-      <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none">
+      {/* aria-live="polite" announces toasts to screen readers without interrupting.
+          Errors use aria-live="assertive" so they're announced immediately. */}
+      <div
+        aria-live="polite"
+        aria-atomic="false"
+        className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none"
+      >
         {toasts.map(t => (
-          <div key={t.id} className={`flex items-center gap-2 px-5 py-3 rounded-2xl shadow-2xl text-white text-[13px] font-semibold animate-bounce-in pointer-events-auto ${
-            t.type === "success" ? "bg-green-600" : t.type === "error" ? "bg-red-600" : "bg-blue-600"
-          }`}>
+          <div
+            key={t.id}
+            role={t.type === "error" ? "alert" : "status"}
+            aria-live={t.type === "error" ? "assertive" : "polite"}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl shadow-2xl text-white text-[13px] font-semibold animate-bounce-in pointer-events-auto ${
+              t.type === "success" ? "bg-green-600" : t.type === "error" ? "bg-red-600" : "bg-blue-600"
+            }`}
+          >
             {t.type === "success" ? "✓" : t.type === "error" ? "✕" : "ℹ"} {t.message}
           </div>
         ))}
@@ -3892,6 +3920,7 @@ function ListingCard({
   allListings = [],
   onToast,
   onCardClick,
+  onUpdate,
 }) {
   const [deleting, setDeleting] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -3967,10 +3996,16 @@ function ListingCard({
       return;
     }
     setClaiming(true);
-    // PIN persistence: reuse cached PIN if user claimed before
+    // PIN persistence: reuse cached PIN if user claimed before.
+    // 6-digit cryptographic PIN — Math.random() is not cryptographically
+    // secure. crypto.getRandomValues() is the correct standard.
     const pinCacheKey = `eq_pin_${listing.id}_${user.email}`;
     const cachedPin = sessionStorage.getItem(pinCacheKey);
-    const pin = cachedPin || String(Math.floor(1000 + Math.random() * 9000));
+    const pin = cachedPin || (() => {
+      const arr = new Uint32Array(1);
+      crypto.getRandomValues(arr);
+      return String(100000 + (arr[0] % 900000));
+    })();
     sessionStorage.setItem(pinCacheKey, pin); // cache for undo/reclaim
     try {
       const res = await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
@@ -4022,10 +4057,14 @@ function ListingCard({
         }),
       });
       if (!res.ok) throw new Error("Failed to save changes.");
-      // Update listing in UI by patching local object
-      listing.title = editForm.title.trim();
-      listing.description = editForm.description.trim();
-      listing.quantity = editForm.quantity ? parseInt(editForm.quantity, 10) : null;
+      // Notify parent to update its state immutably — never mutate props directly
+      if (onUpdate) {
+        onUpdate(listing.id, {
+          title: editForm.title.trim(),
+          description: editForm.description.trim(),
+          quantity: editForm.quantity ? parseInt(editForm.quantity, 10) : null,
+        });
+      }
       setShowEditModal(false);
       if (onToast) onToast("Listing updated!", "success");
     } catch (err) {
@@ -4067,6 +4106,8 @@ function ListingCard({
             <img
               src={images[imgIdx]}
               alt={listing.title}
+              loading="lazy"
+              decoding="async"
               onError={() => setImgError(true)}
               onClick={(e) => {
                 e.stopPropagation();
@@ -4843,6 +4884,9 @@ function ListingsSection({
               allListings={listings}
               onToast={showToast}
               onCardClick={onCardClick ? () => onCardClick(listing) : undefined}
+              onUpdate={(id, fields) => setListings(prev =>
+                prev.map(l => String(l.id) === String(id) ? { ...l, ...fields } : l)
+              )}
             />
           ))}
         </div>
@@ -6696,31 +6740,6 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
     finally { setSettingsSaving(false); }
   };
 
-  // Resize an image file to a small JPEG using Canvas and return a base64
-  // data URL. This runs entirely in the browser, so no Supabase Storage
-  // bucket is needed — the compressed photo (~8-20KB) is stored directly
-  // in the user's auth metadata as `avatar_url`.
-  const resizeImageToDataUrl = (file) =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      const objectUrl = URL.createObjectURL(file);
-      img.onload = () => {
-        URL.revokeObjectURL(objectUrl);
-        const MAX = 200; // px — enough for a profile photo
-        const scale = Math.min(MAX / img.width, MAX / img.height, 1);
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Could not read image.")); };
-      img.src = objectUrl;
-    });
-
   const uploadAvatar = async (file) => {
     if (!file) return;
     if (!file.type || !file.type.startsWith("image/")) {
@@ -6729,13 +6748,53 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
     }
     if (file.size > 10 * 1024 * 1024) { showToast("Image must be under 10MB.", "error"); return; }
 
-    // Instant local preview while we resize + save
+    // Instant local preview while upload runs
     const previousAvatar = avatarUrl;
     const localPreview = URL.createObjectURL(file);
     setAvatarUrl(localPreview);
     setAvatarUploading(true);
     try {
-      const dataUrl = await resizeImageToDataUrl(file);
+      // Resize to 400×400 max — keeps files small while allowing decent quality
+      const resized = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const objUrl = URL.createObjectURL(file);
+        img.onload = () => {
+          URL.revokeObjectURL(objUrl);
+          const MAX = 400;
+          const scale = Math.min(MAX / img.width, MAX / img.height, 1);
+          const w = Math.round(img.width * scale);
+          const h = Math.round(img.height * scale);
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+          canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("Resize failed")), "image/jpeg", 0.88);
+        };
+        img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error("Could not read image.")); };
+        img.src = objUrl;
+      });
+
+      // Upload to Supabase Storage — stores a real URL, not a 20KB base64 in the JWT
+      const safeId = (user?.id || user?.email || "user").replace(/[^a-z0-9]/gi, "");
+      const filename = `${safeId}-${Date.now()}.jpg`;
+      const uploadRes = await fetch(
+        `${SUPABASE_STORAGE}/object/profile-photos/${filename}`,
+        {
+          method: "POST",
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${getToken()}`,
+            "Content-Type": "image/jpeg",
+          },
+          body: resized,
+        }
+      );
+      if (!uploadRes.ok) {
+        const errData = await uploadRes.json().catch(() => ({}));
+        throw new Error(errData.message || "Upload failed. Check that your 'profile-photos' bucket exists and is public in Supabase Storage.");
+      }
+      const url = `${SUPABASE_STORAGE}/object/public/profile-photos/${filename}`;
+
+      // Save URL to auth metadata — tiny string instead of a 20KB base64 blob
       const metaRes = await fetch(`${AUTH_URL}/user`, {
         method: "PUT",
         headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${getToken()}` },
@@ -6744,12 +6803,12 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
           account_type: user?.account_type || "", phone: user?.phone || "",
           region: user?.region || "", email: user?.email || "",
           institution_domain: user?.institution_domain || "", tax_id: user?.tax_id || "",
-          avatar_url: dataUrl,
+          avatar_url: url,
         }}),
       });
       if (!metaRes.ok) throw new Error("Profile update failed. Please try again.");
-      setAvatarUrl(dataUrl);
-      const updated = { ...user, avatar_url: dataUrl };
+      setAvatarUrl(url);
+      const updated = { ...user, avatar_url: url };
       localStorage.setItem("eq_user", JSON.stringify(updated));
       if (onUserUpdate) onUserUpdate(updated);
       showToast("Profile photo updated!", "success");
@@ -7195,6 +7254,45 @@ function LandingListingPreview({ onAuth }) {
   );
 }
 
+// ─── Error Boundary ───────────────────────────────────────────────────────────
+// Catches any JavaScript error in the component tree and shows a friendly
+// recovery screen instead of a blank white page.
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null, info: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) {
+    this.setState({ info });
+    // In production you'd send this to Sentry / your error tracking service
+    console.error("[Equilinkz] Unhandled error:", error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-5 text-3xl">⚠️</div>
+          <h1 className="text-[22px] font-bold text-slate-900 mb-2">Something went wrong</h1>
+          <p className="text-[14px] text-slate-500 max-w-sm mb-6">
+            An unexpected error occurred. Your data is safe. Please try refreshing the page.
+          </p>
+          <button
+            onClick={() => { this.setState({ error: null, info: null }); }}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all mr-3"
+          >
+            Try Again
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold px-6 py-3 rounded-xl transition-all"
+          >
+            Refresh Page
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showAuth, setShowAuth] = useState(false);
@@ -7272,7 +7370,24 @@ export default function App() {
                 };
                 localStorage.setItem("eq_user", JSON.stringify(refreshedUser));
               }
+            } else {
+              // Token returned but no access_token — force sign out
+              localStorage.removeItem("eq_token");
+              localStorage.removeItem("eq_refresh_token");
+              localStorage.removeItem("eq_user");
+              setUser(null);
             }
+          } else {
+            // Refresh failed (token expired/revoked) — sign out with a clear message
+            // instead of leaving the user stuck with a broken session
+            localStorage.removeItem("eq_token");
+            localStorage.removeItem("eq_refresh_token");
+            localStorage.removeItem("eq_user");
+            setUser(null);
+            // Small delay so the UI has time to re-render before showing message
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent("eq:session-expired"));
+            }, 100);
           }
         }
       } catch {}
@@ -7359,6 +7474,7 @@ export default function App() {
   };
 
   return (
+    <ErrorBoundary>
     <ToastProvider>
     <div className="font-sans antialiased text-slate-900 bg-white">
       <CookieBanner onPrivacy={() => setShowPrivacy(true)} />
@@ -7462,5 +7578,6 @@ export default function App() {
       )}
     </div>
     </ToastProvider>
+    </ErrorBoundary>
   );
 }
