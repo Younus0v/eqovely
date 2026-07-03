@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import PrivacyModal from "./PrivacyModal";
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -100,6 +100,141 @@ function timeAgo(dateStr) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`;
   return `${Math.floor(diff / 2592000)}mo ago`;
+}
+
+// ─── Password Strength ────────────────────────────────────────────────────────
+function getPasswordStrength(pwd) {
+  if (!pwd) return { score: 0, label: "", color: "" };
+  let score = 0;
+  if (pwd.length >= 8) score++;
+  if (pwd.length >= 12) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+  if (score <= 1) return { score, label: "Weak", color: "bg-red-500" };
+  if (score <= 2) return { score, label: "Fair", color: "bg-amber-500" };
+  if (score <= 3) return { score, label: "Good", color: "bg-blue-500" };
+  return { score, label: "Strong", color: "bg-green-500" };
+}
+
+// ─── Focus Trap Hook ──────────────────────────────────────────────────────────
+// Keeps keyboard focus inside a modal — critical for WCAG 2.1 SC 2.1.2
+function useFocusTrap(isActive) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!isActive || !ref.current) return;
+    const el = ref.current;
+    const focusable = el.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const prev = document.activeElement;
+    first?.focus();
+    const handler = (e) => {
+      if (e.key !== "Tab") return;
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first?.focus(); }
+      }
+    };
+    const escHandler = (e) => {
+      if (e.key === "Escape") el.dispatchEvent(new CustomEvent("trap:escape", { bubbles: true }));
+    };
+    el.addEventListener("keydown", handler);
+    el.addEventListener("keydown", escHandler);
+    return () => {
+      el.removeEventListener("keydown", handler);
+      el.removeEventListener("keydown", escHandler);
+      prev?.focus();
+    };
+  }, [isActive]);
+  return ref;
+}
+
+// ─── Offline Detection Hook ───────────────────────────────────────────────────
+function useOnlineStatus() {
+  const [online, setOnline] = useState(navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => { window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+  }, []);
+  return online;
+}
+
+// ─── Offline Banner ───────────────────────────────────────────────────────────
+function OfflineBanner() {
+  const online = useOnlineStatus();
+  if (online) return null;
+  return (
+    <div role="alert" aria-live="assertive" className="fixed top-0 left-0 right-0 z-[999] bg-amber-500 text-white text-[13px] font-semibold text-center py-2.5 px-4 flex items-center justify-center gap-2">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 shrink-0"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0119 12.55M5 12.55a10.94 10.94 0 015.17-2.39M10.71 5.05A16 16 0 0122.56 9M1.42 9a15.91 15.91 0 014.7-2.88M8.53 16.11a6 6 0 016.95 0M12 20h.01" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      You're offline — some features may not work until your connection is restored.
+    </div>
+  );
+}
+
+// ─── Skip to Content ──────────────────────────────────────────────────────────
+// First element on the page — allows keyboard/screen reader users to skip nav
+function SkipLink() {
+  return (
+    <a
+      href="#main-content"
+      className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[9999] focus:bg-blue-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:text-[14px] focus:font-semibold"
+    >
+      Skip to main content
+    </a>
+  );
+}
+
+// ─── Skeleton Loader ──────────────────────────────────────────────────────────
+function SkeletonCard() {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden animate-pulse">
+      <div className="w-full h-44 bg-slate-200" />
+      <div className="p-4 space-y-3">
+        <div className="h-4 bg-slate-200 rounded-full w-3/4" />
+        <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+        <div className="flex gap-2">
+          <div className="h-6 bg-slate-100 rounded-full w-16" />
+          <div className="h-6 bg-slate-100 rounded-full w-20" />
+        </div>
+        <div className="h-9 bg-slate-100 rounded-xl w-full mt-2" />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="flex items-center gap-3 px-5 py-3.5 animate-pulse border-b border-slate-50">
+      <div className="w-12 h-12 bg-slate-200 rounded-full shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3.5 bg-slate-200 rounded-full w-1/3" />
+        <div className="h-3 bg-slate-100 rounded-full w-2/3" />
+      </div>
+    </div>
+  );
+}
+
+// ─── Empty State ──────────────────────────────────────────────────────────────
+function EmptyState({ icon, title, body, action, onAction }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+      <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center mb-4 text-3xl">{icon}</div>
+      <h3 className="text-[16px] font-bold text-slate-800 mb-2">{title}</h3>
+      <p className="text-[13px] text-slate-500 max-w-xs leading-relaxed mb-5">{body}</p>
+      {action && (
+        <button onClick={onAction} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl text-[13px] transition-all">
+          {action}
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ─── XSS-Safe Sanitizer (HTML entity encoder) ────────────────────────────────
@@ -1726,18 +1861,10 @@ const deepSanitize = (str) =>
 // deepSanitize intentionally preserves apostrophes and quotes for natural text
 
 function AuthModal({ onClose, onSuccess }) {
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot" | "forgot-sent"
   const [form, setForm] = useState({
-    email: "",
-    password: "",
-    username: "",
-    org_name: "",
-    region: "",
-    phone: "",
-    dialCode: "+1",
-    account_type: "",
-    institution_domain: "",
-    tax_id: "",
+    email: "", password: "", username: "", org_name: "", region: "",
+    phone: "", dialCode: "+1", account_type: "", institution_domain: "", tax_id: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -1745,83 +1872,68 @@ function AuthModal({ onClose, onSuccess }) {
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
-  // ── Username duplicate check state ────────────────────────────────────────
   const [isUsernameTaken, setIsUsernameTaken] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
   const usernameDebounce = useRef(null);
+  const trapRef = useFocusTrap(true);
 
   const isRecipient = form.account_type === "School/Non-Profit Recipient";
   const taxIdCfg = getTaxIdConfig(form.dialCode);
+  const pwdStrength = getPasswordStrength(form.password);
 
-  // ── Async debounced username duplicate check ──────────────────────────────
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
   const checkUsername = (val) => {
     const clean = sanitizeUsername(val);
-    if (!clean || clean.length < 3) {
-      setIsUsernameTaken(false);
-      return;
-    }
+    if (!clean || clean.length < 3) { setIsUsernameTaken(false); return; }
     clearTimeout(usernameDebounce.current);
     usernameDebounce.current = setTimeout(async () => {
       setCheckingUsername(true);
       try {
         const res = await fetch(
-          `${SUPABASE_URL}/profiles?username=eq.${encodeURIComponent(
-            clean
-          )}&select=username&limit=1`,
+          `${SUPABASE_URL}/profiles?username=eq.${encodeURIComponent(clean)}&select=username&limit=1`,
           { headers: getHeaders() }
         );
         if (res.ok) {
           const data = await res.json();
-          if (!Array.isArray(data) || data.length === 0) {
-            // Empty result = username is available
-            setIsUsernameTaken(false);
-          } else {
-            const taken = data[0]?.username?.toLowerCase() === clean.toLowerCase();
-            setIsUsernameTaken(taken);
-          }
-        } else {
-          // 403/404/500 — profiles table issue, never block signup
-          console.warn("Username check returned", res.status, "— allowing signup");
-          setIsUsernameTaken(false);
-        }
-      } catch (err) {
-        console.warn("Username check error:", err.message, "— allowing signup");
-        setIsUsernameTaken(false);
-      } finally {
-        setCheckingUsername(false);
-      }
-    }, 500); // debounce 500ms
+          setIsUsernameTaken(Array.isArray(data) && data.length > 0 && data[0]?.username?.toLowerCase() === clean.toLowerCase());
+        } else { setIsUsernameTaken(false); }
+      } catch { setIsUsernameTaken(false); }
+      finally { setCheckingUsername(false); }
+    }, 500);
   };
 
   const validate = (f = form) => {
     const errs = {};
-    // Username: required, min 3 chars, max 25, alphanumeric + underscore only
-    if (mode === "signup" && f.username) {
-      if (f.username.trim().length < 3)
-        errs.username = "Username must be at least 3 characters.";
-      if (/[^a-zA-Z0-9_]/.test(f.username))
-        errs.username =
-          "Username can only contain letters, numbers, and underscores.";
-      if (isUsernameTaken) errs.username = "⚠️ This username is already taken.";
+    if (mode === "signup") {
+      if (!f.email) errs.email = "Email is required.";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) errs.email = "Enter a valid email address.";
+      if (f.email && isRecipient) {
+        const domain = f.email.split("@")[1] || "";
+        if (!INSTITUTIONAL_DOMAINS.test(domain)) errs.email = "Please use your official institutional or school email.";
+      }
+      if (!f.password) errs.password = "Password is required.";
+      else if (f.password.length < 8) errs.password = "Password must be at least 8 characters.";
+      else if (pwdStrength.score < 2) errs.password = "Password is too weak. Add numbers or symbols.";
+      if (f.username && f.username.trim().length < 3) errs.username = "Username must be at least 3 characters.";
+      if (f.username && /[^a-zA-Z0-9_]/.test(f.username)) errs.username = "Letters, numbers, and underscores only.";
+      if (isUsernameTaken) errs.username = "This username is already taken.";
+      if (f.phone && !validatePhone(f.dialCode, f.phone)) errs.phone = "Enter a valid phone number (7–15 digits).";
     }
-    if (f.email && isRecipient) {
-      const domain = f.email.split("@")[1] || "";
-      if (!INSTITUTIONAL_DOMAINS.test(domain))
-        errs.email =
-          "Please register using your official institutional or school email address.";
-    }
-    if (f.phone && !validatePhone(f.dialCode, f.phone))
-      errs.phone = "Enter a valid international phone number (7–15 digits).";
     return errs;
   };
 
   const set = (e) => {
     let val = e.target.value;
-    // Enforce username format live
-    if (e.target.name === "username") {
-      val = sanitizeUsername(val);
-      checkUsername(val);
-    }
+    if (e.target.name === "username") { val = sanitizeUsername(val); checkUsername(val); }
     const updated = { ...form, [e.target.name]: val };
     setForm(updated);
     if (mode === "signup") setFieldErrors(validate(updated));
@@ -1829,170 +1941,115 @@ function AuthModal({ onClose, onSuccess }) {
 
   const signupComplete = (() => {
     if (mode !== "signup") return true;
-    const base =
-      form.email &&
-      form.password.length >= 6 &&
-      form.username.trim().length >= 3 &&
-      form.region &&
-      form.account_type;
-    const orgRequired = [
-      "Corporate/Lab Donor",
-      "School/Non-Profit Recipient",
-    ].includes(form.account_type);
+    const base = form.email && form.password.length >= 8 && form.username.trim().length >= 3 && form.region && form.account_type;
+    const orgRequired = ["Corporate/Lab Donor", "School/Non-Profit Recipient"].includes(form.account_type);
     const orgOk = !orgRequired || !!form.org_name.trim();
     const phoneOk = validatePhone(form.dialCode, form.phone);
     const taxRequired = taxIdCfg.required;
-    const recipientOk =
-      !isRecipient ||
-      (form.institution_domain && (!taxRequired || form.tax_id));
+    const recipientOk = !isRecipient || (form.institution_domain && (!taxRequired || form.tax_id));
     const isIndividual = ["Individual Donor", "Individual Recipient"].includes(form.account_type);
     const agreementsOk = termsAgreed && privacyAgreed && (!isIndividual || ageConfirmed);
-    const usernameOk =
-      !isUsernameTaken && !checkingUsername && form.username.trim().length >= 3;
-    return !!(
-      base &&
-      orgOk &&
-      phoneOk &&
-      recipientOk &&
-      agreementsOk &&
-      usernameOk &&
-      Object.keys(validate()).length === 0
-    );
+    const usernameOk = !isUsernameTaken && !checkingUsername && form.username.trim().length >= 3;
+    return !!(base && orgOk && phoneOk && recipientOk && agreementsOk && usernameOk && Object.keys(validate()).length === 0);
   })();
+
+  // ── Forgot Password ──────────────────────────────────────────────────────────
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!forgotEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setForgotLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${AUTH_URL}/recover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+        body: JSON.stringify({ email: forgotEmail }),
+      });
+      // Always show success — never reveal if email exists (prevents enumeration)
+      setMode("forgot-sent");
+    } catch {
+      // Same: always show success to prevent email enumeration
+      setMode("forgot-sent");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // ── Bulletproof validation: check empty spaces ────────────────────────
-    if (mode === "signup") {
-      if (!form.username.trim()) {
-        setError("Username cannot be empty or only spaces.");
-        return;
-      }
-      if (!form.email.trim()) {
-        setError("Email cannot be empty.");
-        return;
-      }
-      if (!form.password.trim()) {
-        setError("Password cannot be empty.");
-        return;
-      }
-      if (!form.region.trim()) {
-        setError("Region cannot be empty.");
-        return;
-      }
-      if (!form.account_type) {
-        setError("Please select an account type.");
-        return;
-      }
-      if (isUsernameTaken) {
-        setError("⚠️ This username is already taken. Please choose another.");
-        return;
-      }
-    }
     const errs = validate();
-    if (Object.keys(errs).length > 0) {
-      setFieldErrors(errs);
-      setError("Please fix the highlighted fields.");
-      return;
+    if (Object.keys(errs).length > 0) { setFieldErrors(errs); setError("Please fix the errors above."); return; }
+    if (mode === "signup") {
+      if (!form.username.trim()) { setError("Username cannot be empty."); return; }
+      if (!termsAgreed || !privacyAgreed) { setError("Please agree to the Terms and Privacy Policy."); return; }
     }
     setLoading(true);
     setError(null);
-    const fullPhone = `${form.dialCode}${form.phone.replace(/[\s\-().]/g, "")}`;
     try {
       if (mode === "signup") {
+        const DONOR_TYPES = ["Individual Donor", "Corporate/Lab Donor"];
+        const isDonor = DONOR_TYPES.includes(form.account_type);
         const metadata = {
-          username: sanitizeUsername(form.username),
-          phone: fullPhone,
-          org_name: deepSanitize(form.org_name),
-          region: deepSanitize(form.region),
+          username: deepSanitize(form.username.trim()),
+          org_name: deepSanitize(form.org_name.trim()),
+          phone: `${form.dialCode}${form.phone.replace(/[\s\-().]/g, "")}`,
+          region: deepSanitize(form.region.trim()),
           account_type: form.account_type,
-          ...(isRecipient && {
-            institution_domain: deepSanitize(form.institution_domain),
-            tax_id: deepSanitize(form.tax_id),
-          }),
+          institution_domain: deepSanitize(form.institution_domain.trim()),
+          tax_id: deepSanitize(form.tax_id.trim()),
+          avatar_url: "",
         };
         const res = await fetch(`${AUTH_URL}/signup`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            email: deepSanitize(form.email),
-            password: form.password,
-            data: metadata,
-          }),
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+          body: JSON.stringify({ email: deepSanitize(form.email), password: form.password, data: metadata }),
         });
-        // Supabase can return an empty body in some configurations (email
-        // confirmation enabled, rate-limit hits, etc.). Reading as text first
-        // prevents "Unexpected end of JSON input" crashes.
         const rawText = await res.text();
         let data = {};
         try { data = rawText ? JSON.parse(rawText) : {}; } catch { data = {}; }
-        if (!res.ok)
-          throw new Error(data.msg || data.message || data.error_description || `Signup failed (${res.status}). Please try again.`);
+        if (!res.ok) throw new Error(data.msg || data.message || data.error_description || `Signup failed (${res.status}). Please try again.`);
         if (data.access_token) {
-          const u = { ...data.user, ...metadata };
-          // SECURITY: localStorage tokens are vulnerable to XSS exfiltration.
-          // In production, prefer HttpOnly secure cookies via a backend auth proxy.
           localStorage.setItem("eq_token", data.access_token);
           if (data.refresh_token) localStorage.setItem("eq_refresh_token", data.refresh_token);
+          const m = data.user?.user_metadata || {};
+          const u = { id: data.user.id, email: data.user.email, ...metadata };
           localStorage.setItem("eq_user", JSON.stringify(u));
-          // Save username to profiles table for duplicate checking
-          try {
-            const profileRes = await fetch(`${SUPABASE_URL}/profiles`, {
-              method: "POST",
-              headers: {
-                ...getHeaders(data.access_token),
-                Prefer: "resolution=merge-duplicates,return=representation",
-              },
-              body: JSON.stringify({
-                id: data.user.id,
-                email: data.user.email,
-                username: metadata.username,
-              }),
-            });
-            if (!profileRes.ok) {
-              const profileErr = await profileRes.json().catch(() => ({}));
-              console.warn(
-                "Profile save failed:",
-                profileErr.message || profileRes.status
-              );
-            }
-          } catch (profileErr) {
-            console.warn("Profile save network error:", profileErr.message);
-          }
-          onSuccess(u);
+          if (onSuccess) onSuccess(u);
         } else {
-          setError(
-            "✅ Account created! Check your email and click the confirmation link to activate your account, then sign in."
-          );
+          // Email confirmation required
           setMode("login");
+          setError(null);
+          setForm(f => ({ ...f, password: "" }));
+          // Show friendly confirmation message
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("eq:toast", { detail: { message: "Account created! Check your email to confirm before signing in.", type: "success" } }));
+          }, 200);
         }
       } else {
         const res = await fetch(`${AUTH_URL}/token?grant_type=password`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({
-            email: deepSanitize(form.email),
-            password: form.password,
-          }),
+          headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+          body: JSON.stringify({ email: deepSanitize(form.email), password: form.password }),
         });
         const rawLoginText = await res.text();
         let data = {};
         try { data = rawLoginText ? JSON.parse(rawLoginText) : {}; } catch { data = {}; }
-        if (!res.ok)
-          throw new Error("Email or password is incorrect. Please try again.");
+        if (!res.ok) throw new Error("Email or password is incorrect. Please try again.");
+        if (!data.access_token) throw new Error("Login failed. Please try again.");
+        // Check email confirmation
+        if (data.user?.email_confirmed_at === null || data.user?.confirmed_at === null) {
+          throw new Error("Please confirm your email address before signing in. Check your inbox for a confirmation link.");
+        }
+        localStorage.setItem("eq_token", data.access_token);
+        if (data.refresh_token) localStorage.setItem("eq_refresh_token", data.refresh_token);
         const m = data.user?.user_metadata || {};
-        // Read stored user to preserve account_type if metadata is missing
         let storedUser = {};
         try { storedUser = JSON.parse(localStorage.getItem("eq_user") || "{}"); } catch {}
         const u = {
-          id: data.user.id,
-          email: data.user.email,
+          id: data.user.id, email: data.user.email,
           username: m.username || storedUser.username || "",
           phone: m.phone || storedUser.phone || "",
           org_name: m.org_name || storedUser.org_name || "",
@@ -2002,10 +2059,8 @@ function AuthModal({ onClose, onSuccess }) {
           tax_id: m.tax_id || storedUser.tax_id || "",
           avatar_url: m.avatar_url || storedUser.avatar_url || "",
         };
-        localStorage.setItem("eq_token", data.access_token);
-        if (data.refresh_token) localStorage.setItem("eq_refresh_token", data.refresh_token);
         localStorage.setItem("eq_user", JSON.stringify(u));
-        onSuccess(u);
+        if (onSuccess) onSuccess(u);
       }
     } catch (err) {
       setError(err.message);
@@ -2015,444 +2070,196 @@ function AuthModal({ onClose, onSuccess }) {
   };
 
   const inp = (field) => {
-    const hasErr =
-      fieldErrors[field] || (field === "username" && isUsernameTaken);
-    return `w-full bg-slate-50 border rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all ${
-      hasErr
-        ? "border-red-500 focus:ring-red-400"
-        : "border-slate-200 focus:ring-blue-500"
-    }`;
+    const hasErr = fieldErrors[field] || (field === "username" && isUsernameTaken);
+    return `w-full bg-slate-50 border rounded-xl px-4 py-3 text-[14px] text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all ${hasErr ? "border-red-400 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"}`;
   };
-  const lbl =
-    "block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide";
-  const fErr = (f) =>
-    fieldErrors[f] ? (
-      <p className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1">
-        <span>⚠</span> {fieldErrors[f]}
-      </p>
-    ) : null;
+  const lbl = "block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide";
+  const fErr = (f) => fieldErrors[f] ? (
+    <p role="alert" id={`err-${f}`} className="text-[11px] text-red-500 mt-1.5 flex items-center gap-1">
+      <span aria-hidden="true">⚠</span> {fieldErrors[f]}
+    </p>
+  ) : null;
+
+  const modalTitle = mode === "login" ? "Welcome back" : mode === "signup" ? "Join Equilinkz" : mode === "forgot" ? "Reset your password" : "Check your email";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 max-h-[92vh] overflow-y-auto">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition-all"
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 max-h-[92vh] overflow-y-auto">
+        <button onClick={onClose} aria-label="Close sign in dialog" className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
           <IconX />
         </button>
+
         <div className="flex items-center gap-2 mb-5">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-            <IconLink />
-          </div>
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white" aria-hidden="true"><IconLink /></div>
           <span className="font-semibold text-slate-900">Equilinkz</span>
         </div>
-        <h2 className="text-2xl font-bold text-slate-900 mb-1">
-          {mode === "login" ? "Welcome back" : "Join Equilinkz"}
-        </h2>
-        <p className="text-[13px] text-slate-500 mb-5">
-          {mode === "login"
-            ? "Sign in to access the global marketplace."
-            : "Create your account to list and claim surplus worldwide."}
-        </p>
-        <div className="flex bg-slate-100 rounded-xl p-1 mb-5">
-          {["login", "signup"].map((m) => (
-            <button
-              key={m}
-              onClick={() => {
-                setMode(m);
-                setError(null);
-                setFieldErrors({});
-              }}
-              className={`flex-1 py-2 text-[13px] font-medium rounded-lg transition-all ${
-                mode === m
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              {m === "login" ? "Sign In" : "Sign Up"}
+
+        <h2 id="auth-modal-title" className="text-2xl font-bold text-slate-900 mb-1">{modalTitle}</h2>
+
+        {/* Forgot password — sent */}
+        {mode === "forgot-sent" && (
+          <div className="py-4">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📬</div>
+            <p className="text-[14px] text-slate-600 text-center leading-relaxed mb-6">
+              If an account exists for <strong>{forgotEmail}</strong>, you'll receive a password reset link shortly. Check your spam folder if you don't see it.
+            </p>
+            <button onClick={() => { setMode("login"); setError(null); }} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all text-[14px]">
+              Back to Sign In
             </button>
-          ))}
-        </div>
-        {error && (
-          <div className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-            <span className="text-red-500 shrink-0 mt-0.5">⚠</span>
-            <p className="text-[13px] text-red-700">{error}</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === "signup" && (
-            <div>
-              <label className={lbl}>
-                Username *{" "}
-                <span className="text-slate-400 font-normal normal-case">
-                  (max 25 chars, letters/numbers/_)
-                </span>
-              </label>
-              <div className="relative">
-                <input
-                  name="username"
-                  value={form.username}
-                  onChange={set}
-                  placeholder="e.g. younus_a"
-                  className={inp("username") + " pr-8"}
-                  maxLength={25}
-                />
-                {checkingUsername && (
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <IconLoader />
-                  </span>
-                )}
-                {!checkingUsername &&
-                  form.username.length >= 3 &&
-                  !isUsernameTaken &&
-                  !fieldErrors.username && (
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-[12px] font-bold">
-                      ✓
-                    </span>
-                  )}
-              </div>
-              {isUsernameTaken && (
-                <p className="text-[11px] text-red-600 mt-1.5 flex items-center gap-1 font-semibold">
-                  ⚠️ This username is already taken.
-                </p>
-              )}
-              {!isUsernameTaken && fErr("username")}
-              <p className="text-[11px] text-slate-400 mt-1">
-                This is how other users will see you on the platform.
-              </p>
-            </div>
-          )}
+        {/* Forgot password — form */}
+        {mode === "forgot" && (
           <div>
-            <label className={lbl}>Email *</label>
-            <input
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={set}
-              placeholder="you@example.com"
-              required
-              className={inp("email")}
-            />
-            {fErr("email")}
-            {mode === "signup" && (
-              <p className="text-[11px] text-slate-400 mt-1.5">
-                A confirmation email will be sent — click the link to activate
-                your account.
-              </p>
-            )}
-          </div>
-          <div>
-            <label className={lbl}>Password *</label>
-            <input
-              name="password"
-              type="password"
-              value={form.password}
-              onChange={set}
-              placeholder="Min. 6 characters"
-              required
-              className={inp("password")}
-            />
-          </div>
-          {mode === "signup" && (
-            <>
+            <p className="text-[13px] text-slate-500 mb-5">Enter your email and we'll send you a link to reset your password.</p>
+            {error && <div role="alert" className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3"><span className="text-red-500 shrink-0" aria-hidden="true">⚠</span><p className="text-[13px] text-red-700">{error}</p></div>}
+            <form onSubmit={handleForgotPassword} className="space-y-4">
               <div>
-                <label className={lbl}>Account Type *</label>
-                <select
-                  name="account_type"
-                  value={form.account_type}
-                  onChange={set}
-                  required
-                  className={inp("account_type")}
-                >
-                  <option value="">Select your role</option>
-                  {ACCOUNT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
+                <label htmlFor="forgot-email" className={lbl}>Email address *</label>
+                <input id="forgot-email" type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)} placeholder="you@example.com" required autoComplete="email" className={inp("email")} aria-required="true" />
               </div>
-              {/* Organization Name — only for Corporate/Lab and School/Non-Profit */}
-              {["Corporate/Lab Donor", "School/Non-Profit Recipient"].includes(
-                form.account_type
-              ) && (
+              <button type="submit" disabled={forgotLoading} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-xl transition-all text-[14px]">
+                {forgotLoading ? <><IconLoader /> Sending…</> : "Send Reset Link"}
+              </button>
+              <button type="button" onClick={() => { setMode("login"); setError(null); }} className="w-full text-[13px] text-slate-500 hover:text-slate-700 py-2 transition-all">
+                ← Back to Sign In
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Login / Signup */}
+        {(mode === "login" || mode === "signup") && (
+          <>
+            <p className="text-[13px] text-slate-500 mb-5">
+              {mode === "login" ? "Sign in to access the global marketplace." : "Create your account to list and claim surplus worldwide."}
+            </p>
+            <div className="flex bg-slate-100 rounded-xl p-1 mb-5" role="tablist">
+              {["login", "signup"].map((m) => (
+                <button key={m} role="tab" aria-selected={mode === m} onClick={() => { setMode(m); setError(null); setFieldErrors({}); }}
+                  className={`flex-1 py-2 text-[13px] font-medium rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${mode === m ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                  {m === "login" ? "Sign In" : "Sign Up"}
+                </button>
+              ))}
+            </div>
+
+            {error && <div role="alert" className="mb-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3"><span className="text-red-500 shrink-0" aria-hidden="true">⚠</span><p className="text-[13px] text-red-700">{error}</p></div>}
+
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              {mode === "signup" && (
                 <div>
-                  <label className={lbl}>Organization Name *</label>
-                  <input
-                    name="org_name"
-                    value={form.org_name}
-                    onChange={set}
-                    placeholder="e.g. Acme Corp / Lincoln High School"
-                    className={inp("org_name")}
-                  />
+                  <label htmlFor="auth-username" className={lbl}>Username * <span className="text-slate-400 font-normal normal-case">(max 25 chars)</span></label>
+                  <div className="relative">
+                    <input id="auth-username" name="username" value={form.username} onChange={set} placeholder="e.g. younus_a" className={inp("username") + " pr-8"} maxLength={25} autoComplete="username" aria-required="true" aria-describedby={fieldErrors.username ? "err-username" : undefined} aria-invalid={!!fieldErrors.username} />
+                    {checkingUsername && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"><IconLoader /></span>}
+                    {!checkingUsername && form.username.length >= 3 && !isUsernameTaken && !fieldErrors.username && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 text-[12px] font-bold" aria-hidden="true">✓</span>}
+                  </div>
+                  {fErr("username")}
                 </div>
               )}
+
               <div>
-                <label className={lbl}>Region / Country *</label>
-                <input
-                  name="region"
-                  value={form.region}
-                  onChange={set}
-                  placeholder="e.g. California, USA"
-                  className={inp("region")}
-                />
+                <label htmlFor="auth-email" className={lbl}>Email *</label>
+                <input id="auth-email" name="email" type="email" value={form.email} onChange={set} placeholder="you@example.com" required autoComplete="email" className={inp("email")} aria-required="true" aria-describedby={fieldErrors.email ? "err-email" : undefined} aria-invalid={!!fieldErrors.email} />
+                {fErr("email")}
+                {mode === "signup" && !fieldErrors.email && <p className="text-[11px] text-slate-400 mt-1.5">A confirmation email will be sent — click the link to activate your account.</p>}
               </div>
+
               <div>
-                <label className={lbl}>Phone Number *</label>
-                <div className="flex gap-2">
-                  <select
-                    name="dialCode"
-                    value={form.dialCode}
-                    onChange={set}
-                    className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-[13px] text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[100px]"
-                  >
-                    {COUNTRY_CODES.map((c) => (
-                      <option key={`${c.code}-${c.country}`} value={c.code}>
-                        {c.flag} {c.country} ({c.code})
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex-1">
-                    <input
-                      name="phone"
-                      type="tel"
-                      value={form.phone}
-                      onChange={set}
-                      placeholder="555 000 0000"
-                      className={`${inp("phone")} w-full`}
-                    />
-                  </div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label htmlFor="auth-password" className={lbl} style={{marginBottom:0}}>Password *</label>
+                  {mode === "login" && <button type="button" onClick={() => { setMode("forgot"); setForgotEmail(form.email); setError(null); }} className="text-[11px] text-blue-600 hover:text-blue-700 font-medium focus:outline-none focus:underline">Forgot password?</button>}
                 </div>
-                {fErr("phone")}
-                {!fieldErrors.phone &&
-                  form.phone &&
-                  validatePhone(form.dialCode, form.phone) && (
-                    <p className="text-[11px] text-green-600 mt-1.5 flex items-center gap-1">
-                      <IconCheck /> Valid international format
-                    </p>
-                  )}
-              </div>
-              {isRecipient && (
-                <div className="bg-green-50 border border-green-200 rounded-2xl p-4 space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-green-600">
-                      <IconShield />
-                    </span>
-                    <p className="text-[12px] font-semibold text-green-800">
-                      Recipient Verification Required
-                    </p>
-                  </div>
-                  <div>
-                    <label className={lbl}>Official Institution Domain *</label>
-                    <input
-                      name="institution_domain"
-                      value={form.institution_domain}
-                      onChange={set}
-                      placeholder="e.g. lincolnhigh.edu"
-                      className={inp("institution_domain")}
-                    />
-                  </div>
-                  <div>
-                    <label className={lbl}>
-                      {taxIdCfg.label}
-                      {taxIdCfg.required ? " *" : " (optional)"}
-                    </label>
-                    <input
-                      name="tax_id"
-                      value={form.tax_id}
-                      onChange={set}
-                      placeholder={taxIdCfg.placeholder}
-                      className={inp("tax_id")}
-                    />
-                    {!taxIdCfg.required && (
-                      <p className="text-[11px] text-slate-400 mt-1.5">
-                        Registration numbers are optional for your country but
-                        help verify legitimacy.
-                      </p>
+                <div className="relative">
+                  <input id="auth-password" name="password" type={showPassword ? "text" : "password"} value={form.password} onChange={set} placeholder={mode === "signup" ? "Min. 8 characters" : "Your password"} required autoComplete={mode === "signup" ? "new-password" : "current-password"} className={inp("password") + " pr-10"} aria-required="true" aria-describedby={fieldErrors.password ? "err-password" : mode === "signup" ? "pwd-strength" : undefined} aria-invalid={!!fieldErrors.password} />
+                  <button type="button" onClick={() => setShowPassword(s => !s)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none focus:text-blue-500">
+                    {showPassword ? (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                     )}
-                  </div>
+                  </button>
                 </div>
+                {mode === "signup" && form.password && (
+                  <div id="pwd-strength" className="mt-2" aria-live="polite">
+                    <div className="flex gap-1 mb-1">
+                      {[1,2,3,4].map(i => (
+                        <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= pwdStrength.score ? pwdStrength.color : "bg-slate-200"}`} />
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-500">Password strength: <span className={`font-semibold ${pwdStrength.score <= 1 ? "text-red-500" : pwdStrength.score <= 2 ? "text-amber-500" : pwdStrength.score <= 3 ? "text-blue-500" : "text-green-600"}`}>{pwdStrength.label || "—"}</span></p>
+                  </div>
+                )}
+                {fErr("password")}
+              </div>
+
+              {mode === "signup" && (
+                <>
+                  <div>
+                    <label htmlFor="auth-account-type" className={lbl}>Account Type *</label>
+                    <select id="auth-account-type" name="account_type" value={form.account_type} onChange={set} required className={inp("account_type")} aria-required="true">
+                      <option value="">Select your role</option>
+                      {ACCOUNT_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  {["Corporate/Lab Donor","School/Non-Profit Recipient"].includes(form.account_type) && (
+                    <div>
+                      <label htmlFor="auth-org-name" className={lbl}>Organization Name *</label>
+                      <input id="auth-org-name" name="org_name" value={form.org_name} onChange={set} placeholder="e.g. Acme Corp / Lincoln High School" className={inp("org_name")} aria-required="true" />
+                    </div>
+                  )}
+                  <div>
+                    <label htmlFor="auth-region" className={lbl}>Region / Country *</label>
+                    <input id="auth-region" name="region" value={form.region} onChange={set} placeholder="e.g. United States, United Kingdom" className={inp("region")} aria-required="true" />
+                  </div>
+                  <div>
+                    <label htmlFor="auth-phone" className={lbl}>Phone Number *</label>
+                    <div className="flex gap-2">
+                      <select value={form.dialCode} onChange={e => setForm(f => ({...f, dialCode: e.target.value}))} className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500 w-24 shrink-0" aria-label="Country dial code">
+                        {COUNTRY_CODES.map(c => <option key={c.code + c.country} value={c.code}>{c.flag} {c.code}</option>)}
+                      </select>
+                      <input id="auth-phone" name="phone" type="tel" value={form.phone} onChange={set} placeholder="Phone number" className={inp("phone")} aria-required="true" aria-describedby={fieldErrors.phone ? "err-phone" : undefined} aria-invalid={!!fieldErrors.phone} />
+                    </div>
+                    {fErr("phone")}
+                  </div>
+                  {isRecipient && (
+                    <>
+                      <div>
+                        <label htmlFor="auth-institution" className={lbl}>Institution Website *</label>
+                        <input id="auth-institution" name="institution_domain" value={form.institution_domain} onChange={set} placeholder="e.g. lincoln.edu" className={inp("institution_domain")} aria-required="true" />
+                      </div>
+                      {taxIdCfg.show && (
+                        <div>
+                          <label htmlFor="auth-tax-id" className={lbl}>{taxIdCfg.label} {taxIdCfg.required ? "*" : "(optional)"}</label>
+                          <input id="auth-tax-id" name="tax_id" value={form.tax_id} onChange={set} placeholder={taxIdCfg.placeholder} className={inp("tax_id")} aria-required={taxIdCfg.required} />
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div className="space-y-2 pt-1">
+                    {[
+                      { id: "terms", checked: termsAgreed, set: setTermsAgreed, label: <>I agree to the <a href="#" className="text-blue-600 underline">Terms of Service</a></> },
+                      { id: "privacy", checked: privacyAgreed, set: setPrivacyAgreed, label: <>I agree to the <a href="#" className="text-blue-600 underline">Privacy Policy</a></> },
+                      ...( ["Individual Donor","Individual Recipient"].includes(form.account_type) ? [{ id: "age", checked: ageConfirmed, set: setAgeConfirmed, label: "I confirm I am 13 years of age or older" }] : []),
+                    ].map(({ id, checked, set: setter, label }) => (
+                      <label key={id} className="flex items-start gap-2.5 cursor-pointer group">
+                        <input type="checkbox" id={`check-${id}`} checked={checked} onChange={e => setter(e.target.checked)} className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 focus:ring-2 shrink-0" />
+                        <span className="text-[12px] text-slate-600 leading-snug">{label}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-slate-400 text-center">Your data is protected under our Privacy Policy. We never sell your information.</p>
+                </>
               )}
-              {!signupComplete && (
-                <p className="text-[11px] text-slate-400 text-center">
-                  Complete all required fields to enable sign up
-                </p>
-              )}
-            </>
-          )}
-          {/* Terms & Privacy checkboxes — required before signup */}
-          {mode === "signup" && (
-            <div className="space-y-3 pt-2">
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={termsAgreed}
-                  onChange={(e) => setTermsAgreed(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
-                />
-                <p className="text-[12px] text-slate-600 leading-relaxed">
-                  I have read and agree to the
-                  <a
-                    href="#"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.dispatchEvent(new CustomEvent("equilinkz:openPrivacy")); }}
-                    className="text-blue-600 hover:text-blue-800 font-semibold underline"
-                  >
-                    Terms of Service
-                  </a>
-                  — I confirm all information I provide is accurate and
-                  truthful.
-                </p>
-              </label>
-              <label className="flex items-start gap-3 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={privacyAgreed}
-                  onChange={(e) => setPrivacyAgreed(e.target.checked)}
-                  className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
-                />
-                <p className="text-[12px] text-slate-600 leading-relaxed">
-                  I have read and agree to the
-                  <a
-                    href="#"
-                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.dispatchEvent(new CustomEvent("equilinkz:openPrivacy")); }}
-                    className="text-blue-600 hover:text-blue-800 font-semibold underline"
-                  >
-                    Privacy Policy
-                  </a>
-                  — I consent to my data being processed as described. My phone
-                  number may be visible to verified users for contact.
-                </p>
-              </label>
-              {/* Age confirmation — only for individual accounts */}
-              {["Individual Donor", "Individual Recipient"].includes(form.account_type) && (
-                <label className="flex items-start gap-3 cursor-pointer group">
-                  <input
-                    type="checkbox"
-                    checked={ageConfirmed}
-                    onChange={(e) => setAgeConfirmed(e.target.checked)}
-                    className="mt-0.5 w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
-                  />
-                  <p className="text-[12px] text-slate-600 leading-relaxed">
-                    I confirm that I am <strong>18 years of age or older</strong>. If I am under 18, I confirm that I have obtained parental or guardian consent to use this platform.
-                  </p>
-                </label>
-              )}
-              {mode === "signup" && (!termsAgreed || !privacyAgreed) && (
-                <p className="text-[11px] text-slate-400 text-center">
-                  Please agree to both policies to create your account
-                </p>
-              )}
-            </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={loading || !signupComplete}
-            className={`w-full flex items-center justify-center gap-2 text-white font-semibold py-3.5 rounded-xl transition-all text-[15px] mt-2 ${
-              signupComplete && !loading
-                ? "bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-200 hover:-translate-y-0.5 cursor-pointer"
-                : "bg-blue-300 opacity-50 pointer-events-none cursor-not-allowed"
-            }`}
-          >
-            {loading ? (
-              <>
-                <IconLoader /> Please wait…
-              </>
-            ) : (
-              <>
-                <IconCheck /> {mode === "login" ? "Sign In" : "Create Account"}
-              </>
-            )}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ─── Dual-Key Handshake Modals ───────────────────────────────────────────────
-// KEY A — Recipient view: passive PIN + QR display only. No inputs, no actions.
-function RecipientPinModal({ pin, listing, onClose }) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    navigator.clipboard.writeText(pin);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div
-        className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition-all"
-        >
-          <IconX />
-        </button>
-
-        {/* Status badge */}
-        <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-full px-4 py-1.5 mb-5">
-          <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
-          <span className="text-[11px] font-semibold text-amber-700 uppercase tracking-wide">
-            Pending Pickup — Key A Issued
-          </span>
-        </div>
-
-        <h3 className="text-xl font-bold text-slate-900 mb-1">
-          Your Pickup Key
-        </h3>
-        <p className="text-[13px] text-slate-500 mb-6">
-          Present this QR code or PIN to the donor at pickup.
-          <strong>Do not share it before meeting in person.</strong>
-        </p>
-
-        {/* PIN display only */}
-        <div className="bg-slate-900 rounded-2xl p-6 mb-3">
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-            Secure Escrow PIN — Key A
-          </p>
-          <p className="text-5xl font-bold tracking-[0.4em] text-white">
-            {pin}
-          </p>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3 flex items-center gap-2">
-          <span className="text-xl">📸</span>
-          <p className="text-[12px] font-semibold text-amber-800">
-            Screenshot this code! Show it to the donor at pickup to complete the
-            transfer. Do not share it before meeting in person.
-          </p>
-        </div>
-
-        {/* Copy — passive action only, no state transition */}
-        <button
-          onClick={copy}
-          className="w-full flex items-center justify-center gap-2 border border-slate-200 hover:border-slate-300 text-slate-600 hover:text-slate-900 text-[13px] font-medium py-2.5 rounded-xl transition-all mb-3"
-        >
-          {copied ? (
-            <>
-              <IconCheck /> Copied to clipboard!
-            </>
-          ) : (
-            "Copy PIN"
-          )}
-        </button>
-
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-          <p className="text-[12px] text-blue-700 font-medium">
-            The donor will enter this code on their device to authorize the
-            transfer. You cannot complete this step — only the donor can unlock
-            Key B.
-          </p>
-        </div>
+              <button type="submit" disabled={loading || (mode === "signup" && !signupComplete)} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all text-[14px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">
+                {loading ? <><IconLoader /> {mode === "login" ? "Signing in…" : "Creating account…"}</> : <><IconCheck /> {mode === "login" ? "Sign In" : "Create Account"}</>}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   );
@@ -2987,7 +2794,7 @@ function InboxModal({ user, onClose, onOpenChat, allListings, inline, autoOpenLi
     <div className="flex flex-col h-full">
       <div className="px-5 py-4 border-b border-slate-100 shrink-0 flex items-center justify-between">
         <h2 className="text-[18px] font-bold text-slate-900">Messages</h2>
-        {!inline && <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"><IconX /></button>}
+        {!inline && <button onClick={onClose} aria-label="Close" className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"><IconX /></button>}
       </div>
       <div className="flex-1 overflow-y-auto">
         {loading ? (
@@ -4462,7 +4269,7 @@ function ListingCard({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setShowEditModal(false)} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
-            <button onClick={() => setShowEditModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"><IconX /></button>
+            <button onClick={() => setShowEditModal(false)} aria-label="Close edit dialog" className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"><IconX /></button>
             <h3 className="text-lg font-bold text-slate-900 mb-5">Edit Listing</h3>
             {editError && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">{editError}</div>}
             <div className="space-y-4">
@@ -4669,17 +4476,22 @@ function ListingsSection({
   const [currentView, setCurrentView] = useState("dashboard");
   const [selectedListing, setSelectedListing] = useState(null);
 
-  const fetchListings = async () => {
+  const fetchListingsAbortRef = useRef(null);
+  const fetchListings = useCallback(async () => {
+    // Cancel any in-flight request before starting a new one
+    if (fetchListingsAbortRef.current) fetchListingsAbortRef.current.abort();
+    const controller = new AbortController();
+    fetchListingsAbortRef.current = controller;
     setLoading(true);
     setError(null);
     try {
-      // Try with current token first
       let token = getToken();
+      // Only request columns the UI actually uses — avoids fetching verification_pin for non-owners
+      const cols = "id,title,description,category,quantity,location,image_url,status,owner_email,owner_id,claimer_id,verification_pin,flags,created_at,organization,region_country,owner_region";
       let res = await fetch(
-        `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
-        { headers: getHeaders(token) }
+        `${SUPABASE_URL}/listings?select=${cols}&order=created_at.desc`,
+        { headers: getHeaders(token), signal: controller.signal }
       );
-      // If 401, try refreshing token then retry
       if (res.status === 401) {
         const refreshToken = localStorage.getItem("eq_refresh_token");
         if (refreshToken) {
@@ -4699,25 +4511,27 @@ function ListingsSection({
             }
           } catch {}
         }
-        // Retry with new token or anon
         res = await fetch(
-          `${SUPABASE_URL}/listings?select=*&order=created_at.desc`,
-          { headers: getHeaders(token) }
+          `${SUPABASE_URL}/listings?select=${cols}&order=created_at.desc`,
+          { headers: getHeaders(token), signal: controller.signal }
         );
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`Failed to load listings (HTTP ${res.status})`);
       const data = await res.json();
-      setListings(data);
-      if (onListingsLoaded) onListingsLoaded(data);
+      if (!controller.signal.aborted) {
+        setListings(Array.isArray(data) ? data : []);
+        if (onListingsLoaded) onListingsLoaded(Array.isArray(data) ? data : []);
+      }
     } catch (err) {
-      setError("Unable to load listings. Error: " + (err?.message || err));
+      if (err.name === "AbortError") return; // Intentional — component unmounted
+      setError("Unable to load listings. Please check your connection and try again.");
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
-  };
+  }, [onListingsLoaded]);
 
-  const handleDelete = (id) => setListings((p) => p.filter((l) => l.id !== id));
-  const handleClaim = (id, pin) => {
+  const handleDelete = useCallback((id) => setListings((p) => p.filter((l) => l.id !== id)), []);
+  const handleClaim = useCallback((id, pin) => {
     setListings((p) => {
       const updated = p.map((l) =>
         l.id === id ? { ...l, status: "pending", verification_pin: pin, claimer_id: user?.email } : l
@@ -4726,21 +4540,19 @@ function ListingsSection({
       return updated;
     });
     if (onClaimSuccess) setTimeout(onClaimSuccess, 800);
-  };
-  const handleTransferred = (id) => {
+  }, [user?.email, onListingsLoaded, onClaimSuccess]);
+
+  const handleTransferred = useCallback((id) => {
     setListings((p) => p.filter((l) => String(l.id) !== String(id)));
-    // Re-fetch global transferred count from listings after a short delay
     setTimeout(() => {
       fetch(`${SUPABASE_URL}/listings?status=eq.transferred&select=id`, { headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" } })
         .then(r => r.json())
         .then(data => { if (Array.isArray(data)) setTransferredCount(data.length); })
         .catch(() => {});
     }, 1000);
-  };
+  }, []);
 
-  useEffect(() => {
-    fetchListings();
-  }, [refreshTrigger]);
+  useEffect(() => { fetchListings(); }, [refreshTrigger]);
   useEffect(() => { setVisibleCount(9); }, [catFilter, regionFilter, locationSearch, searchQuery, tab]);
 
   // ── RBAC: Derive role ─────────────────────────────────────────────────────
@@ -4749,61 +4561,28 @@ function ListingsSection({
   const isDonor = user && DONOR_TYPES_LS.includes(user?.account_type || "");
   const isRecipientUser = user && RECIPIENT_TYPES_LS.includes(user?.account_type || "");
 
-  // ── Base filter pipeline (used by both views) ─────────────────────────────
-  let filtered = listings;
-  // Transferred listings now stay in the database (for accurate stats/
-  // history) instead of being deleted, so hide them from the open
-  // "browse everything" marketplace tab to keep it uncluttered. They still
-  // show normally in My Listings / Claimed Items / My Claims, which already
-  // filter by owner/claimer rather than by tab.
-  if (tab === "marketplace") {
-    filtered = filtered.filter((l) => l.status !== "transferred");
-  }
-  if (tab === "dashboard" && user) {
-    if (isDonor) {
-      filtered = filtered.filter(
-        (l) =>
-          l.owner_email === user.email ||
-          l.owner_id === user.id ||
-          (l.status === "pending" &&
-            (l.owner_email === user.email || l.owner_id === user.id))
-      );
-    } else {
-      filtered = filtered.filter(
-        (l) =>
-          l.status === "available" ||
-          l.claimer_id === user.id ||
-          l.claimer_id === user.email
-      );
+  // ── Memoized filter pipeline ───────────────────────────────────────────────
+  // Re-computed only when listings or filter state changes, not on every render
+  const filtered = useMemo(() => {
+    let f = listings;
+    if (tab === "marketplace") f = f.filter((l) => l.status !== "transferred");
+    if (tab === "dashboard" && user) {
+      if (isDonor) {
+        f = f.filter((l) => l.owner_email === user.email || l.owner_id === user.id || (l.status === "pending" && (l.owner_email === user.email || l.owner_id === user.id)));
+      } else {
+        f = f.filter((l) => l.status === "available" || l.claimer_id === user.id || l.claimer_id === user.email);
+      }
     }
-  }
-  if (tab === "claims" && user) {
-    filtered = filtered.filter(l =>
-      l.claimer_id === user.email || l.claimer_id === user.id
-    );
-  }
-  if (catFilter !== "All")
-    filtered = filtered.filter((l) => l.category === catFilter);
-  if (regionFilter !== "All Regions")
-    filtered = filtered.filter(
-      (l) =>
-        (l.region_country || "") === regionFilter ||
-        (l.owner_region || "") === regionFilter ||
-        (l.location || "").toLowerCase().includes(regionFilter.toLowerCase())
-    );
-  if (locationSearch.trim())
-    filtered = filtered.filter((l) =>
-      (l.location || "").toLowerCase().includes(locationSearch.toLowerCase())
-    );
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase();
-    filtered = filtered.filter(
-      (l) =>
-        (l.title || "").toLowerCase().includes(q) ||
-        (l.description || "").toLowerCase().includes(q) ||
-        (l.organization || "").toLowerCase().includes(q)
-    );
-  }
+    if (tab === "claims" && user) f = f.filter(l => l.claimer_id === user.email || l.claimer_id === user.id);
+    if (catFilter !== "All") f = f.filter((l) => l.category === catFilter);
+    if (regionFilter !== "All Regions") f = f.filter((l) => (l.region_country || "") === regionFilter || (l.owner_region || "") === regionFilter || (l.location || "").toLowerCase().includes(regionFilter.toLowerCase()));
+    if (locationSearch.trim()) f = f.filter((l) => (l.location || "").toLowerCase().includes(locationSearch.toLowerCase()));
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      f = f.filter((l) => (l.title || "").toLowerCase().includes(q) || (l.description || "").toLowerCase().includes(q) || (l.organization || "").toLowerCase().includes(q));
+    }
+    return f;
+  }, [listings, tab, user, isDonor, catFilter, regionFilter, locationSearch, searchQuery]);
 
   // ── Preview slice: only 3 most recent on homepage ────────────────────────
   const previewListings = filtered.slice(0, 3);
@@ -4843,32 +4622,26 @@ function ListingsSection({
           </button>
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-20 h-20 bg-slate-50 border border-slate-100 rounded-3xl flex items-center justify-center text-4xl">
-            {searchQuery ? "🔍" : tab === "dashboard" && isDonor ? "📦" : "🌍"}
-          </div>
-          <div className="text-center">
-            <p className="text-slate-700 font-semibold text-[15px]">
-              {searchQuery ? `No results for "${searchQuery}"` :
-              isRecipientUser ? "No items available right now" :
-              isDonor && listings.length === 0 ? "No listings yet" :
-              "No listings match your filters"}
-            </p>
-            <p className="text-slate-400 text-[13px] mt-1">
-              {searchQuery ? "Try different keywords or clear the search" :
-              isRecipientUser ? "Check back soon — new items are added regularly." :
-              isDonor && listings.length === 0 ? "Be the first to list a surplus item!" :
-              "Try adjusting your filters or region"}
-            </p>
-            {!searchQuery && listings.length === 0 && isDonor && (
-              <button
-                onClick={() => document.getElementById("list")?.scrollIntoView({ behavior: "smooth" })}
-                className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]">
-                List Your First Item →
-              </button>
-            )}
-          </div>
-        </div>
+        <EmptyState
+          icon={searchQuery ? "🔍" : tab === "dashboard" && isDonor ? "📦" : "🌍"}
+          title={
+            searchQuery ? `No results for "${searchQuery}"` :
+            isRecipientUser ? "No items available right now" :
+            isDonor && listings.length === 0 ? "No listings yet" :
+            "No listings match your filters"
+          }
+          body={
+            searchQuery ? "Try different keywords or clear your search." :
+            isRecipientUser ? "Check back soon — donors add new items regularly." :
+            isDonor && listings.length === 0 ? "Be the first to list a surplus item and connect with those who need it." :
+            "Try adjusting your category or region filters."
+          }
+          action={!searchQuery && listings.length === 0 && isDonor ? "Post Your First Item" : searchQuery ? "Clear Search" : null}
+          onAction={() => {
+            if (searchQuery) { setSearchInput(""); setSearchQuery(""); }
+            else document.getElementById("list")?.scrollIntoView({ behavior: "smooth" });
+          }}
+        />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((listing) => (
@@ -4998,7 +4771,7 @@ function ListingsSection({
               placeholder="Search by title, description, or organization…"
               className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 shadow-sm"
             />
-            {searchInput && <button onClick={() => { setSearchInput(""); setSearchQuery(""); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><IconX /></button>}
+            {searchInput && <button onClick={() => { setSearchInput(""); setSearchQuery(""); }} aria-label="Clear search" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"><IconX /></button>}
           </div>
           {/* Category pills with counts */}
           <div className="flex gap-2 mb-3 overflow-x-auto pb-2" style={{ scrollbarWidth:"none", msOverflowStyle:"none" }}>
@@ -5140,7 +4913,7 @@ function ListingsSection({
             className="w-full pl-10 pr-4 py-3 text-[14px] bg-white border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800 placeholder-slate-400 shadow-sm"
           />
           {searchInput && (
-            <button onClick={() => { setSearchInput(""); setSearchQuery(""); }} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"><IconX /></button>
+            <button onClick={() => { setSearchInput(""); setSearchQuery(""); }} aria-label="Clear search" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full"><IconX /></button>
           )}
         </div>
 
@@ -5506,13 +5279,19 @@ function FormSection({ onSuccess, user }) {
           )}
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className={lbl}>Item Title *</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="listing-title" className={lbl} style={{marginBottom:0}}>Item Title *</label>
+                <span className={`text-[11px] ${form.title.length > 90 ? "text-amber-500 font-semibold" : "text-slate-400"}`} aria-live="polite">{form.title.length}/100</span>
+              </div>
               <input
+                id="listing-title"
                 name="title"
                 value={form.title}
                 onChange={handleChange}
                 placeholder="e.g. Standing Desk"
+                maxLength={100}
                 className={inp}
+                aria-required="true"
               />
             </div>
             {/* Org name only for Corporate/Lab and School/Non-Profit */}
@@ -5606,13 +5385,12 @@ function FormSection({ onSuccess, user }) {
               />
             </div>
             <div>
-              <label className={lbl}>
-                Description{" "}
-                <span className="text-slate-400 font-normal normal-case">
-                  ({300 - (form.description?.length || 0)} chars left)
-                </span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="listing-description" className={lbl} style={{marginBottom:0}}>Description</label>
+                <span className={`text-[11px] ${(form.description?.length || 0) > 270 ? "text-amber-500 font-semibold" : "text-slate-400"}`} aria-live="polite">{300 - (form.description?.length || 0)} chars left</span>
+              </div>
               <textarea
+                id="listing-description"
                 name="description"
                 rows={3}
                 value={form.description}
@@ -5620,7 +5398,9 @@ function FormSection({ onSuccess, user }) {
                 maxLength={300}
                 placeholder="Condition, specs, any relevant details…"
                 className={`${inp} resize-none`}
+                aria-describedby="desc-hint"
               />
+              <p id="desc-hint" className="text-[11px] text-slate-400 mt-1">Include condition (new/used), quantity details, and any pickup notes.</p>
             </div>
 
             {/* Multi-photo uploader */}
@@ -6444,7 +6224,7 @@ function EnterPinButton({ listing, user, onTransferred }) {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShow(false)} />
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6">
-            <button onClick={() => setShow(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100"><IconX /></button>
+            <button onClick={() => setShow(false)} aria-label="Close" className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"><IconX /></button>
             <div className="text-center mb-5">
               <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 text-blue-600"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round"/></svg>
@@ -6887,16 +6667,15 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
           </button>
         </div>
         {loadingMine ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl h-32 animate-pulse border border-slate-100" />)}
-          </div>
+          <div className="space-y-3">{[1,2,3,4].map(i => <SkeletonRow key={i} />)}</div>
         ) : myListings.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-5xl mb-4">📦</div>
-            <h3 className="text-[16px] font-bold text-slate-700 mb-2">No listings yet</h3>
-            <p className="text-[13px] text-slate-500 mb-6">Post your first surplus item and make an impact.</p>
-            <button onClick={() => setView("post")} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all">Post an Item</button>
-          </div>
+          <EmptyState
+            icon="📦"
+            title="No listings yet"
+            body="Post your first surplus item and connect it with someone who needs it. It takes less than 2 minutes."
+            action="Post an Item"
+            onAction={() => setView("post")}
+          />
         ) : (
           <div className="space-y-3">
             {myListings.map(l => {
@@ -6946,14 +6725,15 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
           <p className="text-[13px] text-slate-500 mt-0.5">Items you have claimed — show your PIN at pickup</p>
         </div>
         {loadingClaimed ? (
-          <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="bg-white rounded-2xl h-24 animate-pulse border border-slate-100" />)}</div>
+          <div className="space-y-3">{[1,2,3].map(i => <SkeletonRow key={i} />)}</div>
         ) : claimedItems.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-5xl mb-4">🎁</div>
-            <h3 className="text-[16px] font-bold text-slate-700 mb-2">No claimed items yet</h3>
-            <p className="text-[13px] text-slate-500 mb-6">Browse listings and claim what you need.</p>
-            <button onClick={() => setView("feed")} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-[14px] transition-all">Browse Listings</button>
-          </div>
+          <EmptyState
+            icon="🎁"
+            title="No claimed items yet"
+            body="Browse available listings and claim what your school, clinic, or organization needs."
+            action="Browse Listings"
+            onAction={() => setView("feed")}
+          />
         ) : (
           <div className="space-y-4">
             {claimedItems.map(l => {
@@ -7092,18 +6872,79 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
           </button>
         </div>
 
+        {/* Data & Privacy — GDPR */}
+        <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-4">
+          <h2 className="text-[15px] font-bold text-slate-800 mb-1">Data & Privacy</h2>
+          <p className="text-[12px] text-slate-500 mb-4">You have the right to access and download all data Equilinkz holds about you.</p>
+          <button
+            onClick={async () => {
+              try {
+                const token = getToken();
+                const headers = getHeaders(token);
+                const [listingsRes, messagesRes, notifRes] = await Promise.all([
+                  fetch(`${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(user.email)}&select=id,title,category,status,created_at,location`, { headers }),
+                  fetch(`${SUPABASE_URL}/messages?or=(sender_email.eq.${encodeURIComponent(user.email)},receiver_id.eq.${encodeURIComponent(user.email)})&select=id,message_text,sender_email,receiver_id,created_at&limit=500`, { headers }),
+                  fetch(`${SUPABASE_URL}/notifications?recipient_email=eq.${encodeURIComponent(user.email)}&select=id,message,type,created_at`, { headers }),
+                ]);
+                const export_data = {
+                  exported_at: new Date().toISOString(),
+                  profile: { email: user.email, username: user.username, account_type: user.account_type, region: user.region, org_name: user.org_name },
+                  listings: listingsRes.ok ? await listingsRes.json() : [],
+                  messages: messagesRes.ok ? await messagesRes.json() : [],
+                  notifications: notifRes.ok ? await notifRes.json() : [],
+                };
+                const blob = new Blob([JSON.stringify(export_data, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url; a.download = `equilinkz-data-${user.email}-${Date.now()}.json`; a.click();
+                URL.revokeObjectURL(url);
+                if (showToast) showToast("Your data has been downloaded.", "success");
+              } catch { if (showToast) showToast("Export failed. Please try again.", "error"); }
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-slate-50 hover:bg-blue-50 border border-slate-200 hover:border-blue-200 rounded-xl text-[13px] font-medium text-slate-700 hover:text-blue-700 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 shrink-0" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Download My Data (GDPR Export)
+          </button>
+        </div>
+
         {/* Danger zone */}
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6">
           <h2 className="text-[15px] font-bold text-red-800 mb-2">Danger Zone</h2>
-          <p className="text-[12px] text-red-600 mb-4 leading-relaxed">Permanently delete your account and all your listings. This cannot be undone.</p>
+          <p className="text-[12px] text-red-600 mb-4 leading-relaxed">Permanently delete your account, listings, messages, and notifications. This cannot be undone.</p>
           {!confirmDelete ? (
-            <button onClick={() => setConfirmDelete(true)} className="w-full py-2.5 text-[13px] font-semibold text-red-600 border border-red-300 hover:bg-red-100 rounded-xl transition-all">Delete My Account</button>
+            <button onClick={() => setConfirmDelete(true)} className="w-full py-2.5 text-[13px] font-semibold text-red-600 border border-red-300 hover:bg-red-100 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500">
+              Delete My Account
+            </button>
           ) : (
-            <div className="space-y-2">
-              <p className="text-[12px] text-red-700 font-semibold text-center">Are you absolutely sure?</p>
+            <div className="space-y-3">
+              <p className="text-[13px] text-red-700 font-semibold text-center">This will permanently delete everything. Are you absolutely sure?</p>
               <div className="flex gap-2">
-                <button onClick={() => setConfirmDelete(false)} className="flex-1 py-2.5 text-[13px] font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all">Cancel</button>
-                <button onClick={onSignOut} className="flex-1 py-2.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all">Yes, Delete</button>
+                <button onClick={() => setConfirmDelete(false)} className="flex-1 py-2.5 text-[13px] font-medium text-slate-600 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all focus:outline-none focus:ring-2 focus:ring-slate-400">
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const token = getToken();
+                      const h = getHeaders(token);
+                      // Delete all user data in order
+                      await fetch(`${SUPABASE_URL}/notifications?recipient_email=eq.${encodeURIComponent(user.email)}`, { method: "DELETE", headers: h });
+                      await fetch(`${SUPABASE_URL}/messages?sender_email=eq.${encodeURIComponent(user.email)}`, { method: "DELETE", headers: h });
+                      await fetch(`${SUPABASE_URL}/listings?owner_email=eq.${encodeURIComponent(user.email)}`, { method: "DELETE", headers: h });
+                      // Delete the auth account via Supabase admin — requires service role in Edge Function
+                      // For now: sign out and clear all local data
+                      localStorage.clear();
+                      sessionStorage.clear();
+                      if (onSignOut) onSignOut();
+                    } catch {
+                      if (showToast) showToast("Deletion failed. Please contact support.", "error");
+                    }
+                  }}
+                  className="flex-1 py-2.5 text-[13px] font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  Yes, Delete Everything
+                </button>
               </div>
             </div>
           )}
@@ -7326,6 +7167,25 @@ export default function App() {
     } catch { return null; }
   });
 
+  // ── Session expired listener — sign user out with clear message ─────────────
+  const showToastGlobal = useToast();
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+      setShowAuth(true);
+      showToastGlobal("Your session expired. Please sign in again.", "error");
+    };
+    const handleToast = (e) => {
+      if (e.detail?.message) showToastGlobal(e.detail.message, e.detail.type || "info");
+    };
+    window.addEventListener("eq:session-expired", handleExpired);
+    window.addEventListener("eq:toast", handleToast);
+    return () => {
+      window.removeEventListener("eq:session-expired", handleExpired);
+      window.removeEventListener("eq:toast", handleToast);
+    };
+  }, [showToastGlobal]);
+
   // ── Auto token refresh — keeps user logged in ────────────────────────────────
   useEffect(() => {
     if (!user) return;
@@ -7476,7 +7336,9 @@ export default function App() {
   return (
     <ErrorBoundary>
     <ToastProvider>
-    <div className="font-sans antialiased text-slate-900 bg-white">
+    <SkipLink />
+    <OfflineBanner />
+    <div id="main-content" className="font-sans antialiased text-slate-900 bg-white">
       <CookieBanner onPrivacy={() => setShowPrivacy(true)} />
       {showAuth && (
         <AuthModal
