@@ -80,11 +80,6 @@ function markMessagesRead(userEmail) {
 }
 
 // ─── Edge Function URLs ───────────────────────────────────────────────────────
-const EDGE_FUNCTION_URL = (import.meta.env.VITE_SUPABASE_URL || "").replace(
-  "/rest/v1",
-  "/functions/v1/send-whatsapp-otp"
-);
-
 // ─── Founder Access Control ───────────────────────────────────────────────────
 // UI ONLY: this controls frontend visibility of the PDF button.
 // SECURITY WARNING: true admin privileges MUST be enforced via Supabase RLS policies
@@ -878,7 +873,8 @@ function ExpandableDescription({ text }) {
       {isLong && (
         <button
           onClick={() => setExpanded(p => !p)}
-          className="text-[12px] text-blue-600 hover:text-blue-800 font-medium mt-1"
+          aria-expanded={expanded}
+          className="text-[12px] text-blue-600 hover:text-blue-800 font-medium mt-1 focus:outline-none focus:underline"
         >
           {expanded ? "Show less" : "Show more"}
         </button>
@@ -1844,17 +1840,68 @@ function Navbar({
   );
 }
 
+// ─── Terms of Service Modal ───────────────────────────────────────────────────
+function TermsModal({ onClose }) {
+  const trapRef = useFocusTrap(true);
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 id="tos-title" className="text-[17px] font-bold text-slate-900">Terms of Service</h2>
+          <button onClick={onClose} aria-label="Close Terms of Service" className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"><IconX /></button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 text-[13px] text-slate-600 leading-relaxed space-y-4">
+          <p className="text-[11px] text-slate-400">Last updated: {new Date().getFullYear()}</p>
+          <p>Welcome to <strong>Equilinkz</strong>. By creating an account and using this platform, you agree to these Terms of Service. Please read them carefully.</p>
+          <h3 className="text-[14px] font-bold text-slate-800 mt-4">1. About Equilinkz</h3>
+          <p>Equilinkz is a nonprofit platform that connects individuals and organizations with surplus resources to those who need them. We facilitate the listing, claiming, and transfer of surplus items at no cost to users.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">2. Eligibility</h3>
+          <p>You must be at least 13 years old to use Equilinkz. Organizations must be registered legal entities. By signing up, you confirm that the information you provide is accurate and truthful.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">3. Acceptable Use</h3>
+          <p>You agree not to: post fraudulent or misleading listings; harass, abuse, or harm other users; attempt to circumvent our security measures; use the platform for commercial resale; list illegal items or controlled substances; impersonate another person or organization.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">4. Medical Supplies</h3>
+          <p>Medical supply transfers require additional verification. By claiming medical supplies, you confirm your organization is qualified to receive and safely use them. Equilinkz is not responsible for the condition, safety, or suitability of donated medical items.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">5. Transfer Responsibility</h3>
+          <p>Equilinkz facilitates connections but is not a party to any transfer. Donors and recipients are solely responsible for the safe, legal handoff of items. Use the 6-digit PIN verification system to confirm every transfer.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">6. Privacy</h3>
+          <p>We collect only the information necessary to operate the platform. We never sell your data. See our Privacy Policy for full details on how your information is stored and used.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">7. Account Termination</h3>
+          <p>We reserve the right to suspend or terminate accounts that violate these terms, post harmful content, or engage in fraudulent activity. You may delete your account at any time from Settings.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">8. Limitation of Liability</h3>
+          <p>Equilinkz is provided "as is." We are not liable for any damages arising from your use of the platform, the quality of listed items, or disputes between users.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">9. Changes to Terms</h3>
+          <p>We may update these terms as the platform evolves. Continued use of Equilinkz after changes constitutes acceptance of the updated terms.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">10. Contact</h3>
+          <p>Questions about these terms? Contact us through the platform or reach out to the founding team directly.</p>
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100">
+          <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
+            I Understand
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Auth Modal ───────────────────────────────────────────────────────────────
 // ── Username sanitizer: alphanumeric + underscore, max 25 chars ──────────────
 const sanitizeUsername = (val) =>
   val.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 25);
 
 // ── Deep XSS sanitizer: escapes HTML and strips scripts ──────────────────────
+// deepSanitize: strips dangerous script tags and event handlers before DB storage.
+// Does NOT replace < > with HTML entities — React's JSX renderer auto-escapes
+// those when displaying text. Double-encoding caused users to see "&lt;" literally.
 const deepSanitize = (str) =>
   String(str || "")
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
     .replace(/javascript:/gi, "")
     .replace(/on\w+\s*=/gi, "")
     .trim();
@@ -1875,6 +1922,7 @@ function AuthModal({ onClose, onSuccess }) {
   const [isUsernameTaken, setIsUsernameTaken] = useState(false);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const usernameDebounce = useRef(null);
@@ -2239,9 +2287,10 @@ function AuthModal({ onClose, onSuccess }) {
                     </>
                   )}
                   <div className="space-y-2 pt-1">
+                    {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
                     {[
-                      { id: "terms", checked: termsAgreed, set: setTermsAgreed, label: <>I agree to the <a href="#" className="text-blue-600 underline">Terms of Service</a></> },
-                      { id: "privacy", checked: privacyAgreed, set: setPrivacyAgreed, label: <>I agree to the <a href="#" className="text-blue-600 underline">Privacy Policy</a></> },
+                      { id: "terms", checked: termsAgreed, set: setTermsAgreed, label: <>I agree to the <button type="button" onClick={() => setShowTerms(true)} className="text-blue-600 underline hover:text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded">Terms of Service</button></> },
+                      { id: "privacy", checked: privacyAgreed, set: setPrivacyAgreed, label: <>I agree to the <a href="#privacy-policy" className="text-blue-600 underline hover:text-blue-700">Privacy Policy</a></> },
                       ...( ["Individual Donor","Individual Recipient"].includes(form.account_type) ? [{ id: "age", checked: ageConfirmed, set: setAgeConfirmed, label: "I confirm I am 13 years of age or older" }] : []),
                     ].map(({ id, checked, set: setter, label }) => (
                       <label key={id} className="flex items-start gap-2.5 cursor-pointer group">
@@ -3334,6 +3383,30 @@ function useToast() {
   return React.useContext(ToastContext) || (() => {});
 }
 
+// ─── App Event Listener ───────────────────────────────────────────────────────
+// This component is rendered INSIDE ToastProvider so useToast() works correctly.
+// The App root cannot call useToast() because it owns the ToastProvider as a child.
+function AppEventListener({ setUser, setShowAuth }) {
+  const showToast = useToast();
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+      setShowAuth(true);
+      showToast("Your session expired. Please sign in again.", "error");
+    };
+    const handleToast = (e) => {
+      if (e.detail?.message) showToast(e.detail.message, e.detail.type || "info");
+    };
+    window.addEventListener("eq:session-expired", handleExpired);
+    window.addEventListener("eq:toast", handleToast);
+    return () => {
+      window.removeEventListener("eq:session-expired", handleExpired);
+      window.removeEventListener("eq:toast", handleToast);
+    };
+  }, [showToast, setUser, setShowAuth]);
+  return null;
+}
+
 
 // ─── Cookie Consent Banner ────────────────────────────────────────────────────
 function CookieBanner({ onPrivacy }) {
@@ -3822,6 +3895,8 @@ function ListingCard({
           status: "pending",
           verification_pin: parseInt(pin, 10),
           claimer_id: user.email,
+          // Store reason for medical supply claims — required for accountability trail
+          ...(reason ? { claim_reason: reason } : {}),
         }),
       });
       if (res.ok) {
@@ -3882,18 +3957,28 @@ function ListingCard({
   };
 
   const handleFlag = async () => {
+    if (!user) { if (onToast) onToast("Sign in to report a listing.", "error"); return; }
     try {
-      const newFlags = flagged
-        ? Math.max(0, (listing.flags || 1) - 1)
-        : (listing.flags || 0) + 1;
-      await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
-        method: "PATCH",
-        headers: getHeaders(getToken()),
-        body: JSON.stringify({ flags: newFlags }),
-      });
-      setFlagged(!flagged);
+      if (flagged) {
+        // Un-flag: delete from listing_flags table
+        await fetch(
+          `${SUPABASE_URL}/listing_flags?listing_id=eq.${listing.id}&user_email=eq.${encodeURIComponent(user.email)}`,
+          { method: "DELETE", headers: getHeaders(getToken()) }
+        );
+        setFlagged(false);
+      } else {
+        // Flag: insert into listing_flags — UNIQUE constraint prevents double-flagging
+        const res = await fetch(`${SUPABASE_URL}/listing_flags`, {
+          method: "POST",
+          headers: { ...getHeaders(getToken()), Prefer: "return=minimal" },
+          body: JSON.stringify({ listing_id: listing.id, user_email: user.email }),
+        });
+        if (!res.ok && res.status !== 409) throw new Error("Failed to report.");
+        setFlagged(true);
+        if (onToast) onToast("Listing reported. Our team will review it.", "success");
+      }
     } catch {
-      if (onToast) onToast("Failed to report.", "error");
+      if (onToast) onToast("Failed to report. Please try again.", "error");
     }
   };
 
@@ -3923,12 +4008,15 @@ function ListingCard({
               className="w-full h-full object-cover transition-all duration-300 cursor-zoom-in"
             />
             {images.length > 1 && (
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1" role="tablist" aria-label="Image gallery">
                 {images.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setImgIdx(i)}
-                    className={`w-1.5 h-1.5 rounded-full transition-all ${
+                    role="tab"
+                    aria-selected={i === imgIdx}
+                    aria-label={`Photo ${i + 1} of ${images.length}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-all focus:outline-none focus:ring-1 focus:ring-white ${
                       i === imgIdx ? "bg-white scale-125" : "bg-white/50"
                     }`}
                   />
@@ -3990,7 +4078,7 @@ function ListingCard({
                 {ownerBadge.label}
               </span>
             )}
-            {(listing.owner_transfers_completed >= 3) && (
+            {(listing.owner_transfers_completed >= 3 || listing._ownerTransferCount >= 3) && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700" title="Completed 3+ verified transfers">
                 ✓ Trusted Donor
               </span>
@@ -4427,6 +4515,17 @@ function ListingCard({
   );
 }
 
+// React.memo: prevents ListingCard from re-rendering when the parent updates
+// (e.g. unread count badge polling every 15s, refreshTrigger changes) unless
+// this specific listing's data or the user actually changed.
+const MemoListingCard = React.memo(ListingCard, (prev, next) =>
+  prev.listing.id === next.listing.id &&
+  prev.listing.status === next.listing.status &&
+  prev.listing.flags === next.listing.flags &&
+  prev.listing._ownerTransferCount === next.listing._ownerTransferCount &&
+  prev.user?.email === next.user?.email
+);
+
 // ─── Listings Section ─────────────────────────────────────────────────────────
 function ListingsSection({
   refreshTrigger,
@@ -4519,8 +4618,29 @@ function ListingsSection({
       if (!res.ok) throw new Error(`Failed to load listings (HTTP ${res.status})`);
       const data = await res.json();
       if (!controller.signal.aborted) {
-        setListings(Array.isArray(data) ? data : []);
-        if (onListingsLoaded) onListingsLoaded(Array.isArray(data) ? data : []);
+        const listings = Array.isArray(data) ? data : [];
+        // Enrich each listing with the owner's total transfer count so the
+        // "Trusted Donor" badge (≥3 completed transfers) works correctly.
+        // We do a single aggregated query grouped by owner_email to avoid N+1.
+        try {
+          const ownerEmails = [...new Set(listings.map(l => l.owner_email).filter(Boolean))];
+          if (ownerEmails.length > 0) {
+            const countRes = await fetch(
+              `${SUPABASE_URL}/listings?status=eq.transferred&select=owner_email&owner_email=in.(${ownerEmails.map(e => encodeURIComponent(e)).join(",")})`,
+              { headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" }, signal: controller.signal }
+            );
+            if (countRes.ok) {
+              const transferred = await countRes.json();
+              const countByOwner = {};
+              (Array.isArray(transferred) ? transferred : []).forEach(t => {
+                countByOwner[t.owner_email] = (countByOwner[t.owner_email] || 0) + 1;
+              });
+              listings.forEach(l => { l._ownerTransferCount = countByOwner[l.owner_email] || 0; });
+            }
+          }
+        } catch {} // Non-critical — badge just won't show if this fails
+        setListings(listings);
+        if (onListingsLoaded) onListingsLoaded(listings);
       }
     } catch (err) {
       if (err.name === "AbortError") return; // Intentional — component unmounted
@@ -4595,20 +4715,7 @@ function ListingsSection({
     <>
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="bg-white border border-slate-100 rounded-2xl overflow-hidden animate-pulse"
-            >
-              <div className="w-full h-44 bg-slate-100" />
-              <div className="p-5 space-y-3">
-                <div className="h-4 bg-slate-100 rounded-full w-3/4" />
-                <div className="h-3 bg-slate-100 rounded-full w-1/2" />
-                <div className="h-3 bg-slate-100 rounded-full w-full" />
-                <div className="h-3 bg-slate-100 rounded-full w-5/6" />
-              </div>
-            </div>
-          ))}
+          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
         </div>
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
@@ -4645,7 +4752,7 @@ function ListingsSection({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((listing) => (
-            <ListingCard
+            <MemoListingCard
               key={listing.id}
               listing={listing}
               user={user}
@@ -6429,18 +6536,20 @@ function Dashboard({
       </main>
 
       {/* ── MOBILE BOTTOM NAV ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-1 py-1 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-1 py-1 shadow-lg" role="navigation" aria-label="Main navigation">
         {navItems.filter(n => ["feed","mylistings","claimed","messages","settings"].includes(n.id)).slice(0,5).map(item => (
           <button
             key={item.id}
             onClick={() => setDashView(item.id)}
-            className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
+            aria-label={item.label}
+            aria-current={dashView === item.id ? "page" : undefined}
+            className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${
               dashView === item.id ? "text-blue-600" : "text-slate-400 hover:text-slate-700"
             }`}
           >
             {item.icon}
             <span className="text-[9px] font-medium">{item.label.split(" ")[0]}</span>
-            {item.badge && <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{item.badge}</span>}
+            {item.badge && <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center" aria-label={`${item.badge} unread`}>{item.badge}</span>}
           </button>
         ))}
       </div>
@@ -7167,25 +7276,6 @@ export default function App() {
     } catch { return null; }
   });
 
-  // ── Session expired listener — sign user out with clear message ─────────────
-  const showToastGlobal = useToast();
-  useEffect(() => {
-    const handleExpired = () => {
-      setUser(null);
-      setShowAuth(true);
-      showToastGlobal("Your session expired. Please sign in again.", "error");
-    };
-    const handleToast = (e) => {
-      if (e.detail?.message) showToastGlobal(e.detail.message, e.detail.type || "info");
-    };
-    window.addEventListener("eq:session-expired", handleExpired);
-    window.addEventListener("eq:toast", handleToast);
-    return () => {
-      window.removeEventListener("eq:session-expired", handleExpired);
-      window.removeEventListener("eq:toast", handleToast);
-    };
-  }, [showToastGlobal]);
-
   // ── Auto token refresh — keeps user logged in ────────────────────────────────
   useEffect(() => {
     if (!user) return;
@@ -7336,6 +7426,9 @@ export default function App() {
   return (
     <ErrorBoundary>
     <ToastProvider>
+    {/* AppEventListener MUST be inside ToastProvider so useToast() works correctly.
+        App itself renders ToastProvider as a child, so it cannot call useToast directly. */}
+    <AppEventListener setUser={setUser} setShowAuth={setShowAuth} />
     <SkipLink />
     <OfflineBanner />
     <div id="main-content" className="font-sans antialiased text-slate-900 bg-white">
