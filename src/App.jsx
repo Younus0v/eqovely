@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import PrivacyModal from "./PrivacyModal";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  ENVIRONMENT VARIABLES — copy this block into your StackBlitz .env file:
@@ -80,6 +79,11 @@ function markMessagesRead(userEmail) {
 }
 
 // ─── Edge Function URLs ───────────────────────────────────────────────────────
+const EDGE_FUNCTION_URL = (import.meta.env.VITE_SUPABASE_URL || "").replace(
+  "/rest/v1",
+  "/functions/v1/send-whatsapp-otp"
+);
+
 // ─── Founder Access Control ───────────────────────────────────────────────────
 // UI ONLY: this controls frontend visibility of the PDF button.
 // SECURITY WARNING: true admin privileges MUST be enforced via Supabase RLS policies
@@ -873,8 +877,7 @@ function ExpandableDescription({ text }) {
       {isLong && (
         <button
           onClick={() => setExpanded(p => !p)}
-          aria-expanded={expanded}
-          className="text-[12px] text-blue-600 hover:text-blue-800 font-medium mt-1 focus:outline-none focus:underline"
+          className="text-[12px] text-blue-600 hover:text-blue-800 font-medium mt-1"
         >
           {expanded ? "Show less" : "Show more"}
         </button>
@@ -1089,6 +1092,7 @@ function ChatWindow({ listing, user, onClose }) {
           sender_id: String(senderId),
           sender_email: String(senderEmail),
           sender_name: String(senderName),
+          sender_avatar_url: String(user?.avatar_url || ""),
           receiver_id: String(receiverId),
           message_text: String(text),
         }),
@@ -1579,6 +1583,140 @@ function NotificationBell({ user, onOpenChat, listings }) {
   );
 }
 
+// ─── Recipient PIN Modal ──────────────────────────────────────────────────────
+// Shown to the RECIPIENT immediately after claiming — displays the 6-digit PIN
+// they must show to the donor at pickup to verify the handoff.
+function RecipientPinModal({ pin, listing, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const trapRef = useFocusTrap(true);
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(String(pin)).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const digits = String(pin).padStart(6, "0").split("");
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="pin-modal-title">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center">
+        {/* Success icon */}
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-8 h-8 text-green-600" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </div>
+
+        <h2 id="pin-modal-title" className="text-[20px] font-bold text-slate-900 mb-1">Item Claimed!</h2>
+        <p className="text-[13px] text-slate-500 mb-6 leading-relaxed">
+          Show this 6-digit PIN to <strong>{listing?.owner_email?.split("@")[0] || "the donor"}</strong> when you meet to collect <strong>"{listing?.title}"</strong>.
+        </p>
+
+        {/* PIN digits */}
+        <div className="flex items-center justify-center gap-2 mb-2" aria-label={`Your PIN is ${String(pin)}`}>
+          {digits.map((d, i) => (
+            <div key={i} className="w-10 h-12 bg-blue-50 border-2 border-blue-200 rounded-xl flex items-center justify-center text-[22px] font-black text-blue-700 select-none">
+              {d}
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] text-slate-400 mb-5">Keep this PIN private — only share it with the donor in person</p>
+
+        {/* Copy button */}
+        <button
+          onClick={handleCopy}
+          className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          {copied ? (
+            <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4" aria-hidden="true"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/></svg> Copied!</>
+          ) : (
+            <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" strokeLinecap="round"/></svg> Copy PIN</>
+          )}
+        </button>
+        <button onClick={onClose} className="w-full text-[13px] text-slate-500 hover:text-slate-700 py-2 transition-all focus:outline-none focus:underline">
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Privacy Policy Modal ─────────────────────────────────────────────────────
+function PrivacyPolicyModal({ onClose }) {
+  const trapRef = useFocusTrap(true);
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="pp-title">
+      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[88vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <h2 id="pp-title" className="text-[17px] font-bold text-slate-900">Privacy Policy</h2>
+          <button onClick={onClose} aria-label="Close Privacy Policy" className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto px-6 py-5 text-[13px] text-slate-600 leading-relaxed space-y-4">
+          <p className="text-[11px] text-slate-400">Last updated: {new Date().getFullYear()} · Equilinkz Nonprofit Platform</p>
+
+          <p>Equilinkz ("we", "our", "the platform") is a nonprofit initiative dedicated to connecting surplus resources with those who need them. This Privacy Policy explains what data we collect, why we collect it, and how we protect it.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">1. Data We Collect</h3>
+          <p><strong>Account data:</strong> When you register, we collect your email address, username, account type (donor or recipient), organization name (if applicable), phone number, and region. This is required to operate the platform.</p>
+          <p><strong>Listing data:</strong> Information you provide when posting surplus items — title, description, category, quantity, location, and photos.</p>
+          <p><strong>Message data:</strong> Messages exchanged between donors and recipients through the platform.</p>
+          <p><strong>Usage data:</strong> Basic interaction logs (claims, transfers, listings posted) used to calculate impact statistics and improve the platform.</p>
+          <p><strong>Profile photos:</strong> If you upload a profile photo, it is stored securely in our cloud storage.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">2. How We Use Your Data</h3>
+          <p>We use your data to: operate and improve the platform; connect donors with recipients; send notifications about your listings and claims; ensure platform security; calculate and display anonymous impact statistics; comply with legal obligations.</p>
+          <p>We do <strong>not</strong> use your data for advertising. We do <strong>not</strong> sell your data to any third party. We do <strong>not</strong> share your data with partners without your consent.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">3. Data Storage & Security</h3>
+          <p>All data is stored securely using Supabase, a SOC 2 Type II compliant database platform. Access is protected by Row Level Security (RLS) policies — meaning each user can only access their own data. Passwords are hashed and never stored in plain text. Authentication tokens are managed securely.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">4. Your Rights (GDPR / CCPA)</h3>
+          <p>You have the right to: access all data we hold about you (use the "Download My Data" button in Settings); correct inaccurate information; delete your account and all associated data (use "Delete My Account" in Settings); withdraw consent at any time.</p>
+          <p>For EU/EEA users, we act as the data controller under GDPR. For California residents, we comply with CCPA requirements.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">5. Cookies</h3>
+          <p>We use minimal, essential cookies and local browser storage only to maintain your login session. We do not use tracking cookies or third-party analytics cookies.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">6. Data Retention</h3>
+          <p>We retain your data for as long as your account is active. When you delete your account, your listings, messages, and notifications are deleted within 30 days. Some anonymized aggregate data (e.g. total transfers completed) may be retained for impact reporting.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">7. Third-Party Services</h3>
+          <p>We use Supabase for database and authentication infrastructure. Their privacy policy applies to infrastructure-level data processing. We do not integrate with social media platforms, advertising networks, or data brokers.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">8. Children's Privacy</h3>
+          <p>Equilinkz is not directed at children under 13. We do not knowingly collect data from children under 13. If you believe a child has created an account, contact us immediately.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">9. Changes to This Policy</h3>
+          <p>We may update this Privacy Policy as the platform grows. We will notify registered users of significant changes via the platform's notification system.</p>
+
+          <h3 className="text-[14px] font-bold text-slate-800">10. Contact</h3>
+          <p>Questions about your privacy? Contact the Equilinkz team through the platform. Founded by Younus Abdulkadir.</p>
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100 shrink-0">
+          <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
+            I Understand
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 function Navbar({
   onDonate,
@@ -1840,6 +1978,93 @@ function Navbar({
   );
 }
 
+// ─── Password Reset Modal ─────────────────────────────────────────────────────
+// Shown when a user clicks the reset link from their email. Supabase redirects
+// back to the app with #access_token=...&type=recovery in the URL hash.
+function PasswordResetModal({ token, onClose }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [done, setDone] = useState(false);
+  const trapRef = useFocusTrap(true);
+  const strength = getPasswordStrength(password);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (strength.score < 2) { setError("Password is too weak. Add numbers or symbols."); return; }
+    if (password !== confirm) { setError("Passwords do not match."); return; }
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch(`${AUTH_URL}/user`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ password }),
+      });
+      const text = await res.text();
+      const data = text ? JSON.parse(text) : {};
+      if (!res.ok) throw new Error(data.message || "Failed to reset password.");
+      setDone(true);
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="reset-pwd-title">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" aria-hidden="true" />
+      <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
+        {done ? (
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">✅</div>
+            <h2 className="text-[20px] font-bold text-slate-900 mb-2">Password Updated!</h2>
+            <p className="text-[13px] text-slate-500 mb-6">Your password has been reset. You can now sign in with your new password.</p>
+            <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
+              Sign In
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white" aria-hidden="true">🔑</div>
+              <span className="font-semibold text-slate-900">Equilinkz</span>
+            </div>
+            <h2 id="reset-pwd-title" className="text-[22px] font-bold text-slate-900 mb-1">Set New Password</h2>
+            <p className="text-[13px] text-slate-500 mb-5">Choose a strong password for your account.</p>
+            {error && <div role="alert" className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">⚠ {error}</div>}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="reset-pwd" className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">New Password *</label>
+                <div className="relative">
+                  <input id="reset-pwd" type={showPwd ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="Min. 8 characters" autoComplete="new-password" required className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-[14px] pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-required="true" />
+                  <button type="button" onClick={() => setShowPwd(s => !s)} aria-label={showPwd ? "Hide password" : "Show password"} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d={showPwd ? "M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24M1 1l22 22" : "M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 9a3 3 0 100 6 3 3 0 000-6z"} strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  </button>
+                </div>
+                {password && (
+                  <div className="mt-2" aria-live="polite">
+                    <div className="flex gap-1 mb-1">{[1,2,3,4].map(i => <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= strength.score ? strength.color : "bg-slate-200"}`} />)}</div>
+                    <p className="text-[11px] text-slate-500">Strength: <span className={`font-semibold ${strength.score <= 1 ? "text-red-500" : strength.score <= 2 ? "text-amber-500" : strength.score <= 3 ? "text-blue-500" : "text-green-600"}`}>{strength.label || "—"}</span></p>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label htmlFor="reset-confirm" className="block text-[11px] font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Confirm Password *</label>
+                <input id="reset-confirm" type={showPwd ? "text" : "password"} value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repeat your password" autoComplete="new-password" required className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-[14px] focus:outline-none focus:ring-2 transition-all ${confirm && confirm !== password ? "border-red-400 focus:ring-red-400" : "border-slate-200 focus:ring-blue-500"}`} aria-required="true" />
+                {confirm && confirm !== password && <p className="text-[11px] text-red-500 mt-1">⚠ Passwords don't match</p>}
+              </div>
+              <button type="submit" disabled={loading || !password || !confirm} className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
+                {loading ? "Updating…" : "Set New Password"}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Terms of Service Modal ───────────────────────────────────────────────────
 function TermsModal({ onClose }) {
   const trapRef = useFocusTrap(true);
@@ -1849,41 +2074,35 @@ function TermsModal({ onClose }) {
     return () => document.removeEventListener("keydown", h);
   }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="tos-title">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <h2 id="tos-title" className="text-[17px] font-bold text-slate-900">Terms of Service</h2>
-          <button onClick={onClose} aria-label="Close Terms of Service" className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"><IconX /></button>
+          <button onClick={onClose} aria-label="Close Terms of Service" className="w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+          </button>
         </div>
         <div className="overflow-y-auto px-6 py-5 text-[13px] text-slate-600 leading-relaxed space-y-4">
           <p className="text-[11px] text-slate-400">Last updated: {new Date().getFullYear()}</p>
-          <p>Welcome to <strong>Equilinkz</strong>. By creating an account and using this platform, you agree to these Terms of Service. Please read them carefully.</p>
-          <h3 className="text-[14px] font-bold text-slate-800 mt-4">1. About Equilinkz</h3>
-          <p>Equilinkz is a nonprofit platform that connects individuals and organizations with surplus resources to those who need them. We facilitate the listing, claiming, and transfer of surplus items at no cost to users.</p>
+          <p>Welcome to <strong>Equilinkz</strong>. By creating an account, you agree to these Terms. Please read them carefully.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">1. About Equilinkz</h3>
+          <p>Equilinkz is a nonprofit platform that connects individuals and organizations with surplus resources to those who need them. We facilitate listing, claiming, and transfer of surplus items at no cost.</p>
           <h3 className="text-[14px] font-bold text-slate-800">2. Eligibility</h3>
-          <p>You must be at least 13 years old to use Equilinkz. Organizations must be registered legal entities. By signing up, you confirm that the information you provide is accurate and truthful.</p>
+          <p>You must be at least 13 years old. Organizations must be registered legal entities. All information you provide must be accurate and truthful.</p>
           <h3 className="text-[14px] font-bold text-slate-800">3. Acceptable Use</h3>
-          <p>You agree not to: post fraudulent or misleading listings; harass, abuse, or harm other users; attempt to circumvent our security measures; use the platform for commercial resale; list illegal items or controlled substances; impersonate another person or organization.</p>
+          <p>You agree not to: post fraudulent or misleading listings; harass or harm other users; circumvent security measures; use the platform for commercial resale; list illegal items or controlled substances; impersonate others.</p>
           <h3 className="text-[14px] font-bold text-slate-800">4. Medical Supplies</h3>
-          <p>Medical supply transfers require additional verification. By claiming medical supplies, you confirm your organization is qualified to receive and safely use them. Equilinkz is not responsible for the condition, safety, or suitability of donated medical items.</p>
+          <p>By claiming medical supplies, you confirm your organization is qualified to receive and safely use them. Equilinkz is not responsible for the condition or suitability of donated medical items.</p>
           <h3 className="text-[14px] font-bold text-slate-800">5. Transfer Responsibility</h3>
-          <p>Equilinkz facilitates connections but is not a party to any transfer. Donors and recipients are solely responsible for the safe, legal handoff of items. Use the 6-digit PIN verification system to confirm every transfer.</p>
-          <h3 className="text-[14px] font-bold text-slate-800">6. Privacy</h3>
-          <p>We collect only the information necessary to operate the platform. We never sell your data. See our Privacy Policy for full details on how your information is stored and used.</p>
-          <h3 className="text-[14px] font-bold text-slate-800">7. Account Termination</h3>
-          <p>We reserve the right to suspend or terminate accounts that violate these terms, post harmful content, or engage in fraudulent activity. You may delete your account at any time from Settings.</p>
-          <h3 className="text-[14px] font-bold text-slate-800">8. Limitation of Liability</h3>
-          <p>Equilinkz is provided "as is." We are not liable for any damages arising from your use of the platform, the quality of listed items, or disputes between users.</p>
-          <h3 className="text-[14px] font-bold text-slate-800">9. Changes to Terms</h3>
-          <p>We may update these terms as the platform evolves. Continued use of Equilinkz after changes constitutes acceptance of the updated terms.</p>
-          <h3 className="text-[14px] font-bold text-slate-800">10. Contact</h3>
-          <p>Questions about these terms? Contact us through the platform or reach out to the founding team directly.</p>
+          <p>Equilinkz facilitates connections but is not a party to any transfer. Donors and recipients are solely responsible for safe, legal handoffs. Always use the 6-digit PIN to verify every transfer.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">6. Account Termination</h3>
+          <p>We reserve the right to suspend accounts that violate these terms. You may delete your account at any time from Settings.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">7. Limitation of Liability</h3>
+          <p>Equilinkz is provided "as is." We are not liable for damages arising from your use of the platform, item quality, or disputes between users.</p>
         </div>
         <div className="px-6 py-4 border-t border-slate-100">
-          <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
-            I Understand
-          </button>
+          <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">I Understand</button>
         </div>
       </div>
     </div>
@@ -1896,12 +2115,11 @@ const sanitizeUsername = (val) =>
   val.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 25);
 
 // ── Deep XSS sanitizer: escapes HTML and strips scripts ──────────────────────
-// deepSanitize: strips dangerous script tags and event handlers before DB storage.
-// Does NOT replace < > with HTML entities — React's JSX renderer auto-escapes
-// those when displaying text. Double-encoding caused users to see "&lt;" literally.
 const deepSanitize = (str) =>
   String(str || "")
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
     .replace(/javascript:/gi, "")
     .replace(/on\w+\s*=/gi, "")
     .trim();
@@ -1923,6 +2141,7 @@ function AuthModal({ onClose, onSuccess }) {
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const usernameDebounce = useRef(null);
@@ -2132,6 +2351,8 @@ function AuthModal({ onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+      {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
+      {showPrivacy && <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} />}
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
       <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg p-8 max-h-[92vh] overflow-y-auto">
         <button onClick={onClose} aria-label="Close sign in dialog" className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full text-slate-400 hover:bg-slate-100 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -2287,10 +2508,9 @@ function AuthModal({ onClose, onSuccess }) {
                     </>
                   )}
                   <div className="space-y-2 pt-1">
-                    {showTerms && <TermsModal onClose={() => setShowTerms(false)} />}
                     {[
-                      { id: "terms", checked: termsAgreed, set: setTermsAgreed, label: <>I agree to the <button type="button" onClick={() => setShowTerms(true)} className="text-blue-600 underline hover:text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded">Terms of Service</button></> },
-                      { id: "privacy", checked: privacyAgreed, set: setPrivacyAgreed, label: <>I agree to the <a href="#privacy-policy" className="text-blue-600 underline hover:text-blue-700">Privacy Policy</a></> },
+                      { id: "terms", checked: termsAgreed, set: setTermsAgreed, label: <>I agree to the <button type="button" onClick={() => setShowTerms(true)} className="text-blue-600 underline hover:text-blue-700 focus:outline-none">Terms of Service</button></> },
+                      { id: "privacy", checked: privacyAgreed, set: setPrivacyAgreed, label: <>I agree to the <button type="button" onClick={() => setShowPrivacy(true)} className="text-blue-600 underline hover:text-blue-700 focus:outline-none">Privacy Policy</button></> },
                       ...( ["Individual Donor","Individual Recipient"].includes(form.account_type) ? [{ id: "age", checked: ageConfirmed, set: setAgeConfirmed, label: "I confirm I am 13 years of age or older" }] : []),
                     ].map(({ id, checked, set: setter, label }) => (
                       <label key={id} className="flex items-start gap-2.5 cursor-pointer group">
@@ -2482,7 +2702,7 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
         </p>
 
         <p className="text-[11px] text-slate-500 text-center mb-3">
-          Enter the recipient's 4-digit PIN below
+          Enter the recipient's 6-digit PIN below
         </p>
 
         {success ? (
@@ -2508,18 +2728,18 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
               type="tel"
               inputMode="numeric"
               pattern="[0-9]*"
-              maxLength={4}
+              maxLength={6}
               value={input}
               onChange={(e) => {
                 setInput(e.target.value.replace(/\D/g, ""));
                 setError(null);
               }}
-              placeholder="- - - -"
+              placeholder="— — — — — —"
               className="w-full text-center text-3xl font-bold tracking-[0.4em] bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
             />
             <button
               onClick={handleHandshakeVerify}
-              disabled={loading || input.length < 4}
+              disabled={loading || input.length < 6}
               className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all text-[14px] shadow-lg shadow-blue-200 hover:-translate-y-0.5 disabled:translate-y-0"
             >
               {loading ? (
@@ -3005,6 +3225,7 @@ function InlineChatBody({ listing, user }) {
           sender_id: String(senderId),
           sender_email: String(senderEmail),
           sender_name: String(senderName),
+          sender_avatar_url: String(user?.avatar_url || ""),
           receiver_id: String(receiverId),
           message_text: String(text),
         }),
@@ -3065,6 +3286,7 @@ function InlineChatBody({ listing, user }) {
             const avatarColors = ["bg-purple-500","bg-green-500","bg-amber-500","bg-rose-500","bg-teal-500","bg-indigo-500"];
             const otherAvatarColor = avatarColors[(senderName).charCodeAt(0) % avatarColors.length];
             const myAvatarUrl = user?.avatar_url;
+            const otherAvatarUrl = msg.sender_avatar_url || "";
             const myInitials = (user?.username || user?.org_name || user?.email || "U").slice(0,2).toUpperCase();
             const otherInitials = senderName.slice(0,2).toUpperCase();
 
@@ -3078,7 +3300,9 @@ function InlineChatBody({ listing, user }) {
                         ? <img src={myAvatarUrl} alt="You" className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm" />
                         : <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white font-bold text-[11px] shadow-sm">{myInitials}</div>
                     ) : (
-                      <div className={`w-8 h-8 rounded-full ${otherAvatarColor} flex items-center justify-center text-white font-bold text-[11px] shadow-sm`}>{otherInitials}</div>
+                      otherAvatarUrl
+                        ? <img src={otherAvatarUrl} alt={senderName} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-sm" />
+                        : <div className={`w-8 h-8 rounded-full ${otherAvatarColor} flex items-center justify-center text-white font-bold text-[11px] shadow-sm`}>{otherInitials}</div>
                     )
                   )}
                 </div>
@@ -3383,30 +3607,6 @@ function useToast() {
   return React.useContext(ToastContext) || (() => {});
 }
 
-// ─── App Event Listener ───────────────────────────────────────────────────────
-// This component is rendered INSIDE ToastProvider so useToast() works correctly.
-// The App root cannot call useToast() because it owns the ToastProvider as a child.
-function AppEventListener({ setUser, setShowAuth }) {
-  const showToast = useToast();
-  useEffect(() => {
-    const handleExpired = () => {
-      setUser(null);
-      setShowAuth(true);
-      showToast("Your session expired. Please sign in again.", "error");
-    };
-    const handleToast = (e) => {
-      if (e.detail?.message) showToast(e.detail.message, e.detail.type || "info");
-    };
-    window.addEventListener("eq:session-expired", handleExpired);
-    window.addEventListener("eq:toast", handleToast);
-    return () => {
-      window.removeEventListener("eq:session-expired", handleExpired);
-      window.removeEventListener("eq:toast", handleToast);
-    };
-  }, [showToast, setUser, setShowAuth]);
-  return null;
-}
-
 
 // ─── Cookie Consent Banner ────────────────────────────────────────────────────
 function CookieBanner({ onPrivacy }) {
@@ -3476,7 +3676,7 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
       number: "02",
       icon: "🔍",
       title: "Browse & Claim",
-      desc: "Schools, non-profits, and individuals browse verified listings by category and region. Claim what you need — you'll receive a secure 4-digit pickup PIN instantly.",
+      desc: "Schools, non-profits, and individuals browse verified listings by category and region. Claim what you need — you'll receive a secure 6-digit pickup PIN instantly.",
       cta: "Browse Items",
       action: onBrowse,
       color: "bg-green-50 border-green-100",
@@ -3895,8 +4095,6 @@ function ListingCard({
           status: "pending",
           verification_pin: parseInt(pin, 10),
           claimer_id: user.email,
-          // Store reason for medical supply claims — required for accountability trail
-          ...(reason ? { claim_reason: reason } : {}),
         }),
       });
       if (res.ok) {
@@ -3957,28 +4155,18 @@ function ListingCard({
   };
 
   const handleFlag = async () => {
-    if (!user) { if (onToast) onToast("Sign in to report a listing.", "error"); return; }
     try {
-      if (flagged) {
-        // Un-flag: delete from listing_flags table
-        await fetch(
-          `${SUPABASE_URL}/listing_flags?listing_id=eq.${listing.id}&user_email=eq.${encodeURIComponent(user.email)}`,
-          { method: "DELETE", headers: getHeaders(getToken()) }
-        );
-        setFlagged(false);
-      } else {
-        // Flag: insert into listing_flags — UNIQUE constraint prevents double-flagging
-        const res = await fetch(`${SUPABASE_URL}/listing_flags`, {
-          method: "POST",
-          headers: { ...getHeaders(getToken()), Prefer: "return=minimal" },
-          body: JSON.stringify({ listing_id: listing.id, user_email: user.email }),
-        });
-        if (!res.ok && res.status !== 409) throw new Error("Failed to report.");
-        setFlagged(true);
-        if (onToast) onToast("Listing reported. Our team will review it.", "success");
-      }
+      const newFlags = flagged
+        ? Math.max(0, (listing.flags || 1) - 1)
+        : (listing.flags || 0) + 1;
+      await fetch(`${SUPABASE_URL}/listings?id=eq.${listing.id}`, {
+        method: "PATCH",
+        headers: getHeaders(getToken()),
+        body: JSON.stringify({ flags: newFlags }),
+      });
+      setFlagged(!flagged);
     } catch {
-      if (onToast) onToast("Failed to report. Please try again.", "error");
+      if (onToast) onToast("Failed to report.", "error");
     }
   };
 
@@ -4008,15 +4196,12 @@ function ListingCard({
               className="w-full h-full object-cover transition-all duration-300 cursor-zoom-in"
             />
             {images.length > 1 && (
-              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1" role="tablist" aria-label="Image gallery">
+              <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
                 {images.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setImgIdx(i)}
-                    role="tab"
-                    aria-selected={i === imgIdx}
-                    aria-label={`Photo ${i + 1} of ${images.length}`}
-                    className={`w-1.5 h-1.5 rounded-full transition-all focus:outline-none focus:ring-1 focus:ring-white ${
+                    className={`w-1.5 h-1.5 rounded-full transition-all ${
                       i === imgIdx ? "bg-white scale-125" : "bg-white/50"
                     }`}
                   />
@@ -4078,7 +4263,7 @@ function ListingCard({
                 {ownerBadge.label}
               </span>
             )}
-            {(listing.owner_transfers_completed >= 3 || listing._ownerTransferCount >= 3) && (
+            {(listing.owner_transfers_completed >= 3) && (
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 text-blue-700" title="Completed 3+ verified transfers">
                 ✓ Trusted Donor
               </span>
@@ -4515,17 +4700,6 @@ function ListingCard({
   );
 }
 
-// React.memo: prevents ListingCard from re-rendering when the parent updates
-// (e.g. unread count badge polling every 15s, refreshTrigger changes) unless
-// this specific listing's data or the user actually changed.
-const MemoListingCard = React.memo(ListingCard, (prev, next) =>
-  prev.listing.id === next.listing.id &&
-  prev.listing.status === next.listing.status &&
-  prev.listing.flags === next.listing.flags &&
-  prev.listing._ownerTransferCount === next.listing._ownerTransferCount &&
-  prev.user?.email === next.user?.email
-);
-
 // ─── Listings Section ─────────────────────────────────────────────────────────
 function ListingsSection({
   refreshTrigger,
@@ -4618,29 +4792,8 @@ function ListingsSection({
       if (!res.ok) throw new Error(`Failed to load listings (HTTP ${res.status})`);
       const data = await res.json();
       if (!controller.signal.aborted) {
-        const listings = Array.isArray(data) ? data : [];
-        // Enrich each listing with the owner's total transfer count so the
-        // "Trusted Donor" badge (≥3 completed transfers) works correctly.
-        // We do a single aggregated query grouped by owner_email to avoid N+1.
-        try {
-          const ownerEmails = [...new Set(listings.map(l => l.owner_email).filter(Boolean))];
-          if (ownerEmails.length > 0) {
-            const countRes = await fetch(
-              `${SUPABASE_URL}/listings?status=eq.transferred&select=owner_email&owner_email=in.(${ownerEmails.map(e => encodeURIComponent(e)).join(",")})`,
-              { headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json" }, signal: controller.signal }
-            );
-            if (countRes.ok) {
-              const transferred = await countRes.json();
-              const countByOwner = {};
-              (Array.isArray(transferred) ? transferred : []).forEach(t => {
-                countByOwner[t.owner_email] = (countByOwner[t.owner_email] || 0) + 1;
-              });
-              listings.forEach(l => { l._ownerTransferCount = countByOwner[l.owner_email] || 0; });
-            }
-          }
-        } catch {} // Non-critical — badge just won't show if this fails
-        setListings(listings);
-        if (onListingsLoaded) onListingsLoaded(listings);
+        setListings(Array.isArray(data) ? data : []);
+        if (onListingsLoaded) onListingsLoaded(Array.isArray(data) ? data : []);
       }
     } catch (err) {
       if (err.name === "AbortError") return; // Intentional — component unmounted
@@ -4715,7 +4868,20 @@ function ListingsSection({
     <>
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => <SkeletonCard key={i} />)}
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="bg-white border border-slate-100 rounded-2xl overflow-hidden animate-pulse"
+            >
+              <div className="w-full h-44 bg-slate-100" />
+              <div className="p-5 space-y-3">
+                <div className="h-4 bg-slate-100 rounded-full w-3/4" />
+                <div className="h-3 bg-slate-100 rounded-full w-1/2" />
+                <div className="h-3 bg-slate-100 rounded-full w-full" />
+                <div className="h-3 bg-slate-100 rounded-full w-5/6" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-24 gap-3">
@@ -4752,7 +4918,7 @@ function ListingsSection({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {items.map((listing) => (
-            <MemoListingCard
+            <ListingCard
               key={listing.id}
               listing={listing}
               user={user}
@@ -5647,7 +5813,7 @@ function FormSection({ onSuccess, user }) {
             {[
               { n: "1", t: "Goes live instantly", d: "Your item appears in the marketplace for recipients worldwide to browse." },
               { n: "2", t: "A recipient claims it", d: "You'll get a notification and can message them to arrange pickup." },
-              { n: "3", t: "Verify with a PIN", d: "A secure 4-digit PIN confirms the handoff so nothing gets lost in transit." },
+              { n: "3", t: "Verify with a PIN", d: "A secure 6-digit PIN confirms the handoff so nothing gets lost in transit." },
               { n: "4", t: "Track your impact", d: "Completed transfers count toward your Impact stats and Trusted Donor badge." },
             ].map(step => (
               <div key={step.n} className="flex gap-3">
@@ -5710,7 +5876,7 @@ function MissionSection() {
             {
               icon: "🔒",
               title: "End-to-End Security",
-              desc: "From institutional credential verification at signup to our 4-digit Escrow Handshake PIN at physical pickup, every transaction on Equilinkz is authenticated, logged, and protected at every stage.",
+              desc: "From institutional credential verification at signup to our 6-digit Escrow Handshake PIN at physical pickup, every transaction on Equilinkz is authenticated, logged, and protected at every stage.",
             },
             {
               icon: "🌍",
@@ -6337,7 +6503,7 @@ function EnterPinButton({ listing, user, onTransferred }) {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-6 h-6 text-blue-600"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4" strokeLinecap="round"/></svg>
               </div>
               <h3 className="text-[17px] font-bold text-slate-900">Verify Transfer</h3>
-              <p className="text-[13px] text-slate-500 mt-1">Enter the 4-digit PIN shown on the recipient's screen</p>
+              <p className="text-[13px] text-slate-500 mt-1">Enter the 6-digit PIN shown on the recipient's screen</p>
             </div>
             {error && <div className="mb-4 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-[13px] text-red-700">{error}</div>}
             {pinLoading ? (
@@ -6536,20 +6702,18 @@ function Dashboard({
       </main>
 
       {/* ── MOBILE BOTTOM NAV ── */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-1 py-1 shadow-lg" role="navigation" aria-label="Main navigation">
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-white border-t border-slate-100 flex items-center justify-around px-1 py-1 shadow-lg">
         {navItems.filter(n => ["feed","mylistings","claimed","messages","settings"].includes(n.id)).slice(0,5).map(item => (
           <button
             key={item.id}
             onClick={() => setDashView(item.id)}
-            aria-label={item.label}
-            aria-current={dashView === item.id ? "page" : undefined}
-            className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            className={`relative flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-lg transition-all ${
               dashView === item.id ? "text-blue-600" : "text-slate-400 hover:text-slate-700"
             }`}
           >
             {item.icon}
             <span className="text-[9px] font-medium">{item.label.split(" ")[0]}</span>
-            {item.badge && <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center" aria-label={`${item.badge} unread`}>{item.badge}</span>}
+            {item.badge && <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center">{item.badge}</span>}
           </button>
         ))}
       </div>
@@ -7247,34 +7411,73 @@ export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showAuth, setShowAuth] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [resetToken, setResetToken] = useState(null);
   const [chatListing, setChatListing] = useState(null);
   const [activeChatListing, setActiveChatListing] = useState(null);
   const [showInbox, setShowInbox] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [allListings, setAllListings] = useState([]);
-  const [dashView, setDashView] = useState("feed"); // feed | mylistings | claimed | impact | settings
+  const [dashView, setDashView] = useState("feed");
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [user, setUser] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem("eq_user"));
       const token = localStorage.getItem("eq_token");
       if (!u || !token) return null;
-      // Ensure account_type is always present
       if (!u.account_type) {
-        // Try to recover from Supabase token payload
         try {
           const payload = JSON.parse(atob(token.split(".")[1]));
           const m = payload.user_metadata || {};
-          if (m.account_type) {
-            u.account_type = m.account_type;
-            localStorage.setItem("eq_user", JSON.stringify(u));
-          }
+          if (m.account_type) { u.account_type = m.account_type; localStorage.setItem("eq_user", JSON.stringify(u)); }
         } catch {}
       }
       return u;
     } catch { return null; }
   });
+
+  // ── Handle password reset URL — Supabase sends users back to the app with
+  // #access_token=...&type=recovery in the URL hash after clicking reset link
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes("type=recovery") || hash.includes("type=signup")) {
+      const params = new URLSearchParams(hash.replace("#", ""));
+      const token = params.get("access_token");
+      if (token && hash.includes("type=recovery")) {
+        setResetToken(token);
+        setShowPasswordReset(true);
+        // Clean the URL so token isn't visible in browser history
+        window.history.replaceState(null, "", window.location.pathname);
+      } else if (hash.includes("type=signup")) {
+        // Email confirmed — show success message
+        window.history.replaceState(null, "", window.location.pathname);
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("eq:toast", { detail: { message: "Email confirmed! You can now sign in.", type: "success" } }));
+        }, 500);
+        setShowAuth(true);
+      }
+    }
+  }, []);
+
+  // ── Session expired listener — sign user out with clear message ─────────────
+  const showToastGlobal = useToast();
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+      setShowAuth(true);
+      showToastGlobal("Your session expired. Please sign in again.", "error");
+    };
+    const handleToast = (e) => {
+      if (e.detail?.message) showToastGlobal(e.detail.message, e.detail.type || "info");
+    };
+    window.addEventListener("eq:session-expired", handleExpired);
+    window.addEventListener("eq:toast", handleToast);
+    return () => {
+      window.removeEventListener("eq:session-expired", handleExpired);
+      window.removeEventListener("eq:toast", handleToast);
+    };
+  }, [showToastGlobal]);
 
   // ── Auto token refresh — keeps user logged in ────────────────────────────────
   useEffect(() => {
@@ -7426,24 +7629,25 @@ export default function App() {
   return (
     <ErrorBoundary>
     <ToastProvider>
-    {/* AppEventListener MUST be inside ToastProvider so useToast() works correctly.
-        App itself renders ToastProvider as a child, so it cannot call useToast directly. */}
-    <AppEventListener setUser={setUser} setShowAuth={setShowAuth} />
     <SkipLink />
     <OfflineBanner />
     <div id="main-content" className="font-sans antialiased text-slate-900 bg-white">
       <CookieBanner onPrivacy={() => setShowPrivacy(true)} />
+      {showPasswordReset && resetToken && (
+        <PasswordResetModal
+          token={resetToken}
+          onClose={() => { setShowPasswordReset(false); setResetToken(null); setShowAuth(true); }}
+        />
+      )}
       {showAuth && (
         <AuthModal
           onClose={() => setShowAuth(false)}
           onSuccess={handleAuthSuccess}
         />
       )}
-      <PrivacyModal
-        isOpen={showPrivacy}
-        onClose={() => setShowPrivacy(false)}
-        onAgree={() => setShowPrivacy(false)}
-      />
+      {showPrivacy && (
+        <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} />
+      )}
       {chatListing && (
         <ChatWindow
           listing={chatListing}
