@@ -1556,10 +1556,10 @@ function NotificationBell({ user, onOpenChat, listings }) {
                   <div className="flex items-start gap-2">
                     <span className="text-lg shrink-0">
                       {n.type === "claim"
-                        ? "📦"
+                        ? "box"
                         : n.type === "message"
-                        ? "💬"
-                        : "🔔"}
+                        ? "chat"
+                        : "bell"}
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className="text-[12px] text-slate-700 leading-relaxed">
@@ -1724,6 +1724,7 @@ function Navbar({
   onMission,
   onPartners,
   onImpact,
+  onContact,
   user,
   onAuth,
   onSignOut,
@@ -1780,11 +1781,11 @@ function Navbar({
           >
             Partners
           </button>
-          <button
-            onClick={onImpact}
-            className="text-[13px] font-medium text-slate-500 hover:text-slate-900 transition-colors"
-          >
+          <button onClick={onImpact} className="text-[13px] font-medium text-slate-500 hover:text-slate-900 transition-colors">
             Impact
+          </button>
+          <button onClick={onContact} className="text-[13px] font-medium text-slate-500 hover:text-slate-900 transition-colors">
+            Contact
           </button>
         </div>
         <div className="flex items-center gap-2">
@@ -1908,14 +1909,11 @@ function Navbar({
           >
             Partners
           </button>
-          <button
-            onClick={() => {
-              onImpact();
-              setMenuOpen(false);
-            }}
-            className={navLink}
-          >
+          <button onClick={() => { onImpact(); setMenuOpen(false); }} className={navLink}>
             Impact
+          </button>
+          <button onClick={() => { onContact(); setMenuOpen(false); }} className={navLink}>
+            Contact
           </button>
           {user ? (
             <>
@@ -2017,7 +2015,7 @@ function PasswordResetModal({ token, onClose }) {
       <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md p-8">
         {done ? (
           <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">✅</div>
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-8 h-8 text-green-600"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
             <h2 className="text-[20px] font-bold text-slate-900 mb-2">Password Updated!</h2>
             <p className="text-[13px] text-slate-500 mb-6">Your password has been reset. You can now sign in with your new password.</p>
             <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -2027,7 +2025,7 @@ function PasswordResetModal({ token, onClose }) {
         ) : (
           <>
             <div className="flex items-center gap-2 mb-5">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white" aria-hidden="true">🔑</div>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-white"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
               <span className="font-semibold text-slate-900">Equilinkz</span>
             </div>
             <h2 id="reset-pwd-title" className="text-[22px] font-bold text-slate-900 mb-1">Set New Password</h2>
@@ -2369,7 +2367,7 @@ function AuthModal({ onClose, onSuccess }) {
         {/* Forgot password — sent */}
         {mode === "forgot-sent" && (
           <div className="py-4">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">📬</div>
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-blue-600"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></div>
             <p className="text-[14px] text-slate-600 text-center leading-relaxed mb-6">
               If an account exists for <strong>{forgotEmail}</strong>, you'll receive a password reset link shortly. Check your spam folder if you don't see it.
             </p>
@@ -2857,7 +2855,7 @@ function SettingsModal({ user, onClose, onUpdated, onDeleted }) {
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
-              {t === "profile" ? "👤 Profile" : "⚙️ Account"}
+              {t === "profile" ? "Profile" : "Account"}
             </button>
           ))}
         </div>
@@ -3664,7 +3662,7 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
   const steps = [
     {
       number: "01",
-      icon: "📦",
+      icon: "box",
       title: "List Your Surplus",
       desc: "Donors — companies, labs, or individuals — post surplus items in minutes. Add photos, quantity, location, and category. No fees, no paperwork.",
       cta: "List an Item",
@@ -3674,7 +3672,7 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
     },
     {
       number: "02",
-      icon: "🔍",
+      icon: "search",
       title: "Browse & Claim",
       desc: "Schools, non-profits, and individuals browse verified listings by category and region. Claim what you need — you'll receive a secure 6-digit pickup PIN instantly.",
       cta: "Browse Items",
@@ -3684,7 +3682,7 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
     },
     {
       number: "03",
-      icon: "🤝",
+      icon: "check",
       title: "Verify & Transfer",
       desc: "Meet in person. The recipient shows their PIN, the donor enters it to authorize the handoff. Both parties are protected by our dual-key escrow system.",
       cta: user ? "View My Listings" : "Sign Up Free",
@@ -4104,7 +4102,7 @@ function ListingCard({
         createNotification(
           listing.owner_email,
           "claim",
-          `📦 ${user.email} claimed your item: "${listing.title}". Meet them and verify their PIN to complete the transfer.`,
+          `${user.email} claimed your item: "${listing.title}". Meet them and verify their PIN to complete the transfer.`,
           listing.id
         );
       } else {
@@ -4386,7 +4384,7 @@ function ListingCard({
                   {/* Show claimer info to owner */}
                   {isClaimed && (
                     <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1">
-                      <span>✅</span>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4 text-green-600"><path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       <span className="font-medium">Item Claimed</span>
                     </div>
                   )}
@@ -4597,7 +4595,7 @@ function ListingCard({
             createNotification(
               listing.claimer_id,
               "transfer",
-              `✅ Transfer of "${listing.title}" has been completed! The item is now yours.`,
+              `Transfer of "${listing.title}" has been completed. The item is now yours.`,
               listing.id
             );
             incrementUnitsTransferred(listing.quantity || 1);
@@ -4896,7 +4894,11 @@ function ListingsSection({
         </div>
       ) : items.length === 0 ? (
         <EmptyState
-          icon={searchQuery ? "🔍" : tab === "dashboard" && isDonor ? "📦" : "🌍"}
+          icon={
+            searchQuery
+              ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-400"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35" strokeLinecap="round"/></svg>
+              : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-400"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" strokeLinecap="round"/></svg>
+          }
           title={
             searchQuery ? `No results for "${searchQuery}"` :
             isRecipientUser ? "No items available right now" :
@@ -5071,7 +5073,7 @@ function ListingsSection({
               </select>
             </div>
             <div className="flex items-center gap-2 flex-1">
-              <span className="text-[12px] font-medium text-slate-500 shrink-0">🔍 Location:</span>
+              <span className="text-[12px] font-medium text-slate-500 shrink-0"> Location:</span>
               <input value={locationInput}
                 onChange={(e) => { setLocationInput(e.target.value); clearTimeout(locationDebounce.current); locationDebounce.current = setTimeout(() => setLocationSearch(e.target.value), 300); }}
                 placeholder="Search city, zip, or area…"
@@ -5781,7 +5783,7 @@ function FormSection({ onSuccess, user }) {
       <div className="lg:col-span-2 space-y-4">
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
           <h3 className="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center text-[14px]">💡</span>
+            <span className="w-7 h-7 bg-amber-100 rounded-lg flex items-center justify-center text-[14px]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4 text-amber-600"><path d="M9 18h6M10 22h4M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 01-1 1H9a1 1 0 01-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
             Tips for a great listing
           </h3>
           <ul className="space-y-3 text-[13px] text-slate-600 leading-relaxed">
@@ -5806,7 +5808,7 @@ function FormSection({ onSuccess, user }) {
 
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
           <h3 className="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center text-[14px]">🚀</span>
+            <span className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center text-[14px]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-4 h-4 text-blue-600"><path d="M9 11l3 3L22 4" strokeLinecap="round" strokeLinejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
             What happens after you post
           </h3>
           <div className="space-y-4">
@@ -5845,81 +5847,66 @@ function FormSection({ onSuccess, user }) {
 
 // ─── Mission Section ──────────────────────────────────────────────────────────
 function MissionSection() {
+  const cards = [
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7 text-blue-600"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      ),
+      bg: "bg-blue-50",
+      title: "Precision Matching",
+      desc: "Our verification engine pairs corporate donors with recipient institutions based on item category, regional proximity, and organizational need — eliminating guesswork and ensuring every resource reaches maximum impact.",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7 text-green-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      ),
+      bg: "bg-green-50",
+      title: "End-to-End Security",
+      desc: "From institutional credential verification at signup to our 6-digit Escrow Handshake PIN at physical pickup, every transaction on Equilinkz is authenticated, logged, and protected at every stage.",
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-7 h-7 text-purple-600"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" strokeLinecap="round"/></svg>
+      ),
+      bg: "bg-purple-50",
+      title: "Global Infrastructure",
+      desc: "Operating across 60+ countries and all major world regions, Equilinkz provides the only unified platform purpose-built to coordinate international resource redistribution at scale.",
+    },
+  ];
   return (
-    <section id="mission" className="py-24 bg-white">
+    <section id="mission" className="py-24 bg-white scroll-mt-20">
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-16">
           <div className="flex items-center justify-center gap-2 mb-3">
             <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest">
-              Our Mission
-            </span>
+            <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest">Our Mission</span>
           </div>
           <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">
-            Bridging the Digital Divide, <br className="hidden sm:block" />
-            One Device at a Time
+            Bridging the Resource Gap, <br className="hidden sm:block" />One Transfer at a Time
           </h2>
           <p className="text-slate-500 max-w-2xl mx-auto text-[15px] leading-relaxed">
-            Equilinkz was founded on a singular belief: that geographic and
-            economic circumstance should never determine whether a student has
-            access to the tools they need to learn, grow, and compete in the
-            modern world.
+            Equilinkz was founded on a singular belief: that geographic and economic circumstance should never determine whether a student, clinic, or community has access to the resources they need.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
-          {[
-            {
-              icon: "🎯",
-              title: "Precision Matching",
-              desc: "Our verification engine pairs corporate donors with recipient institutions based on item category, regional proximity, and organizational need — eliminating guesswork and ensuring every device reaches maximum impact.",
-            },
-            {
-              icon: "🔒",
-              title: "End-to-End Security",
-              desc: "From institutional credential verification at signup to our 6-digit Escrow Handshake PIN at physical pickup, every transaction on Equilinkz is authenticated, logged, and protected at every stage.",
-            },
-            {
-              icon: "🌍",
-              title: "Global Infrastructure",
-              desc: "Operating across 60+ countries and all major world regions, Equilinkz provides the only unified platform purpose-built to coordinate international technology redistribution at scale.",
-            },
-          ].map(({ icon, title, desc }) => (
-            <div
-              key={title}
-              className="bg-slate-50 border border-slate-100 rounded-2xl p-7"
-            >
-              <div className="text-4xl mb-4">{icon}</div>
-              <h3 className="text-[17px] font-bold text-slate-900 mb-2">
-                {title}
-              </h3>
-              <p className="text-[13px] text-slate-500 leading-relaxed">
-                {desc}
-              </p>
+          {cards.map(({ icon, bg, title, desc }) => (
+            <div key={title} className="bg-slate-50 border border-slate-100 rounded-2xl p-7">
+              <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center mb-4`}>{icon}</div>
+              <h3 className="text-[17px] font-bold text-slate-900 mb-2">{title}</h3>
+              <p className="text-[13px] text-slate-500 leading-relaxed">{desc}</p>
             </div>
           ))}
         </div>
         <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-3xl p-10 text-white text-center">
-          <h3 className="text-2xl font-bold mb-3">
-            A Message from Our Founder
-          </h3>
+          <h3 className="text-2xl font-bold mb-3">A Message from Our Founder</h3>
           <p className="text-blue-100 text-[15px] leading-relaxed max-w-3xl mx-auto italic mb-4">
-            "I built Equilinkz because I witnessed firsthand how the gap between
-            those who have technology and those who do not compounds every other
-            inequality in education, healthcare, and economic opportunity. This
-            platform is my answer to that problem — a structured, verified, and
-            scalable bridge between surplus and need."
+            "I built Equilinkz because I witnessed firsthand how the gap between those who have resources and those who do not compounds every other inequality in education, healthcare, and economic opportunity. This platform is my answer to that problem — a structured, verified, and scalable bridge between surplus and need."
           </p>
           <div className="inline-flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold">
-              Y
-            </div>
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold">Y</div>
             <div className="text-left">
-              <p className="font-semibold text-white text-[14px]">
-                Younus Abdulkadir
-              </p>
-              <p className="text-blue-200 text-[12px]">
-                Founder & CEO, Equilinkz
-              </p>
+              <p className="font-semibold text-white text-[14px]">Younus Abdulkadir</p>
+              <p className="text-blue-200 text-[12px]">Founder & CEO, Equilinkz</p>
             </div>
           </div>
         </div>
@@ -5939,7 +5926,7 @@ function PartnersSection() {
     { name: "Zeltara Industries",   type: "Corporate Donor",      region: "Asia Pacific",  logo: "ZI" },
   ];
   return (
-    <section id="partners" className="py-24 bg-slate-50">
+    <section id="partners" className="py-24 bg-slate-50 scroll-mt-20">
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-14">
           <div className="flex items-center justify-center gap-2 mb-3">
@@ -5994,7 +5981,7 @@ function PartnersSection() {
 // ─── Impact Section ───────────────────────────────────────────────────────────
 function ImpactSection() {
   return (
-    <section id="impact" className="py-24 bg-white">
+    <section id="impact" className="py-24 bg-white scroll-mt-20">
       <div className="max-w-6xl mx-auto px-6">
         <div className="text-center mb-14">
           <div className="flex items-center justify-center gap-2 mb-3">
@@ -6034,6 +6021,76 @@ function ImpactSection() {
         <p className="text-center text-[11px] text-slate-400 mt-6 italic">
           * These figures represent Equilinkz's platform goals and targets, not verified historical data. We are committed to reaching these milestones as our community grows.
         </p>
+      </div>
+    </section>
+  );
+}
+
+// ─── Contact Section ──────────────────────────────────────────────────────────
+function ContactSection() {
+  return (
+    <section id="contact" className="py-24 bg-slate-50 scroll-mt-20">
+      <div className="max-w-4xl mx-auto px-6">
+        <div className="text-center mb-14">
+          <div className="flex items-center justify-center gap-2 mb-3">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+            <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest">Get In Touch</span>
+          </div>
+          <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">Contact Us</h2>
+          <p className="text-slate-500 max-w-xl mx-auto text-[15px] leading-relaxed">
+            Whether you're a donor, recipient, partner organization, or just curious — we'd love to hear from you.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          {[
+            {
+              icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-blue-600"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+              label: "Email",
+              value: "equilinkz@gmail.com",
+              href: "mailto:equilinkz@gmail.com",
+              bg: "bg-blue-50",
+            },
+            {
+              icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-green-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+              label: "Partnerships",
+              value: "Nonprofit & corporate partnerships welcome",
+              href: "mailto:equilinkz@gmail.com?subject=Partnership Inquiry",
+              bg: "bg-green-50",
+            },
+            {
+              icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-purple-600"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+              label: "Response Time",
+              value: "We reply within 24–48 hours",
+              href: null,
+              bg: "bg-purple-50",
+            },
+          ].map(({ icon, label, value, href, bg }) => (
+            <div key={label} className="bg-white border border-slate-100 rounded-2xl p-6 text-center shadow-sm">
+              <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center mx-auto mb-3`}>{icon}</div>
+              <p className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</p>
+              {href ? (
+                <a href={href} className="text-[14px] font-semibold text-blue-600 hover:text-blue-700 transition-colors break-all">{value}</a>
+              ) : (
+                <p className="text-[14px] font-medium text-slate-700">{value}</p>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl p-10 text-center text-white">
+          <h3 className="text-[22px] font-bold mb-2">Ready to make an impact?</h3>
+          <p className="text-blue-100 text-[14px] mb-6 max-w-md mx-auto leading-relaxed">
+            Join thousands of donors and recipients already using Equilinkz to put surplus resources where they're needed most.
+          </p>
+          <a
+            href="mailto:equilinkz@gmail.com"
+            className="inline-flex items-center gap-2 bg-white text-blue-600 hover:bg-blue-50 font-semibold px-6 py-3 rounded-xl transition-all text-[14px] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-600"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Send us a message
+          </a>
+        </div>
       </div>
     </section>
   );
@@ -6196,7 +6253,7 @@ function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToa
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl bg-slate-100">📦</div>
+            <div className="w-full h-full flex items-center justify-center bg-slate-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-300"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8L6 7h12l-2-4z" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
           )}
         </div>
 
@@ -6214,8 +6271,8 @@ function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToa
           {/* Meta */}
           <div className="flex flex-wrap gap-3 text-[12px] text-slate-500 mb-4">
             {listing.location && <span className="flex items-center gap-1">📍 {listing.location}</span>}
-            {listing.quantity && <span className="flex items-center gap-1">📦 Qty: {listing.quantity}</span>}
-            {listing.condition && <span className="flex items-center gap-1">✅ {listing.condition}</span>}
+            {listing.quantity && <span className="flex items-center gap-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5 text-slate-400" aria-hidden="true"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" strokeLinecap="round"/></svg> Qty: {listing.quantity}</span>}
+            {listing.condition && <span className="flex items-center gap-1">{listing.condition}</span>}
             {listing.created_at && <span className="flex items-center gap-1">🕐 {new Date(listing.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
           </div>
 
@@ -6943,7 +7000,7 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
           <div className="space-y-3">{[1,2,3,4].map(i => <SkeletonRow key={i} />)}</div>
         ) : myListings.length === 0 ? (
           <EmptyState
-            icon="📦"
+            icon="box"
             title="No listings yet"
             body="Post your first surplus item and connect it with someone who needs it. It takes less than 2 minutes."
             action="Post an Item"
@@ -6957,7 +7014,7 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
               return (
                 <div key={l.id} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-all">
                   <div className="w-14 h-14 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                    {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>}
+                    {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-slate-50"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-300"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8L6 7h12l-2-4z" strokeLinecap="round" strokeLinejoin="round"/></svg></div>}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-semibold text-slate-900 truncate">{l.title}</p>
@@ -7001,7 +7058,7 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
           <div className="space-y-3">{[1,2,3].map(i => <SkeletonRow key={i} />)}</div>
         ) : claimedItems.length === 0 ? (
           <EmptyState
-            icon="🎁"
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-400"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>}
             title="No claimed items yet"
             body="Browse available listings and claim what your school, clinic, or organization needs."
             action="Browse Listings"
@@ -7016,7 +7073,7 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
                 <div key={l.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
                   <div className="flex items-start gap-4">
                     <div className="w-16 h-16 rounded-xl bg-slate-100 overflow-hidden shrink-0">
-                      {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>}
+                      {img ? <img src={img} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-slate-50"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-300"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8L6 7h12l-2-4z" strokeLinecap="round" strokeLinejoin="round"/></svg></div>}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -7319,7 +7376,7 @@ function LandingListingPreview({ onAuth }) {
                       {imgUrl ? (
                         <img src={imgUrl} alt="" className="w-full h-full object-cover blur-sm scale-110" />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-4xl bg-slate-100">📦</div>
+                        <div className="w-full h-full flex items-center justify-center bg-slate-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-300"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8L6 7h12l-2-4z" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
                       )}
                       {/* Lock overlay */}
                       <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] flex items-center justify-center">
@@ -7576,6 +7633,7 @@ export default function App() {
   }, [user]);
 
   const missionRef = useRef(null);
+  const contactRef = useRef(null);
   const browseRef = useRef(null);
   const partnersRef = useRef(null);
   const impactRef = useRef(null);
@@ -7708,6 +7766,7 @@ export default function App() {
             onBrowse={() => setShowAuth(true)}
             onPartners={() => scrollToId("partners")}
             onImpact={() => scrollToId("impact")}
+            onContact={() => scrollToId("contact")}
             onDonate={() => setShowAuth(true)}
             user={user}
             onAuth={() => setShowAuth(true)}
@@ -7732,6 +7791,7 @@ export default function App() {
           <div ref={missionRef}><MissionSection /></div>
           <div ref={partnersRef}><PartnersSection /></div>
           <div ref={impactRef}><ImpactSection /></div>
+          <ContactSection />
           <Footer onPrivacy={() => setShowPrivacy(true)} />
         </>
       )}
