@@ -1113,13 +1113,13 @@ function ChatWindow({ listing, user, onClose }) {
         if (receiverId && receiverId !== senderEmail) {
           sendEmailNotification(
             receiverId,
-            `New message about "${escapeHtml(listing.title)}" on Equilinkz`,
+            `New message about "${escapeHtml(listing.title)}" on Eqovely`,
             `<div style="font-family:sans-serif;max-width:500px;margin:auto;padding:24px">
-              <h2 style="color:#1d4ed8">Equilinkz — New Message</h2>
+              <h2 style="color:#1d4ed8">Eqovely — New Message</h2>
               <p><strong>${escapeHtml(senderName)}</strong> sent you a message about <strong>${escapeHtml(listing.title)}</strong>:</p>
               <blockquote style="border-left:3px solid #1d4ed8;padding-left:12px;color:#334155">${escapeHtml(text.slice(0,200))}${text.length > 200 ? "..." : ""}</blockquote>
-              <p>Log in to Equilinkz to reply.</p>
-              <p style="color:#64748b;font-size:13px">Founded by Younus Abdulkadir · Equilinkz Global Resource Marketplace</p>
+              <p>Log in to Eqovely to reply.</p>
+              <p style="color:#64748b;font-size:13px">Founded by Younus Abdulkadir · Eqovely Global Resource Marketplace</p>
             </div>`
           );
         }
@@ -1285,7 +1285,7 @@ function generateImpactPDF(listings) {
   });
 
   const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-<title>Equilinkz Impact Report</title>
+<title>Eqovely Impact Report</title>
 <style>
   body{font-family:'Helvetica Neue',Arial,sans-serif;margin:0;padding:40px;color:#0f172a;background:#fff;}
   .header{background:linear-gradient(135deg,#1d4ed8,#1e40af);color:white;padding:40px;border-radius:16px;margin-bottom:32px;}
@@ -1302,7 +1302,7 @@ function generateImpactPDF(listings) {
   .badge{display:inline-block;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;}
 </style></head><body>
 <div class="header">
-  <h1>Equilinkz Impact Report</h1>
+  <h1>Eqovely Impact Report</h1>
   <p>Global Resource Redistribution Platform &nbsp;·&nbsp; Generated ${date}</p>
   <p style="margin-top:8px;font-size:13px;">Founded by Younus Abdulkadir &nbsp;·&nbsp; Bridging the Digital Divide</p>
 </div>
@@ -1330,11 +1330,11 @@ function generateImpactPDF(listings) {
 </div>
 <div class="section">
   <h2>Mission Statement</h2>
-  <p style="font-size:13px;color:#475569;line-height:1.7;">Equilinkz exists to eliminate the structural inequality of technology access by creating a verified, secure pipeline from corporate surplus to educational institutions and non-profits worldwide. Every handoff recorded in this report represents a child gaining access to technology, a school equipping its classrooms, and a community building toward a more equitable digital future.</p>
+  <p style="font-size:13px;color:#475569;line-height:1.7;">Eqovely exists to eliminate the structural inequality of technology access by creating a verified, secure pipeline from corporate surplus to educational institutions and non-profits worldwide. Every handoff recorded in this report represents a child gaining access to technology, a school equipping its classrooms, and a community building toward a more equitable digital future.</p>
   <p style="margin-top:12px;"><span class="badge">✓ Verified Platform Data</span></p>
 </div>
 <div class="footer">
-  <p>Equilinkz Global Resource Marketplace &nbsp;·&nbsp; equilinkz.com &nbsp;·&nbsp; © 2025 Younus Abdulkadir</p>
+  <p>Eqovely Global Resource Marketplace &nbsp;·&nbsp; eqovely.com &nbsp;·&nbsp; © 2025 Younus Abdulkadir</p>
   <p>This report was auto-generated from live Supabase database statistics.</p>
 </div>
 </body></html>`;
@@ -1343,7 +1343,7 @@ function generateImpactPDF(listings) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `Equilinkz-Impact-Report-${Date.now()}.html`;
+  a.download = `Eqovely-Impact-Report-${Date.now()}.html`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1667,9 +1667,9 @@ function PrivacyPolicyModal({ onClose }) {
           </button>
         </div>
         <div className="overflow-y-auto px-6 py-5 text-[13px] text-slate-600 leading-relaxed space-y-4">
-          <p className="text-[11px] text-slate-400">Last updated: {new Date().getFullYear()} · Equilinkz Nonprofit Platform</p>
+          <p className="text-[11px] text-slate-400">Last updated: {new Date().getFullYear()} · Eqovely Nonprofit Platform</p>
 
-          <p>Equilinkz ("we", "our", "the platform") is a nonprofit initiative dedicated to connecting surplus resources with those who need them. This Privacy Policy explains what data we collect, why we collect it, and how we protect it.</p>
+          <p>Eqovely ("we", "our", "the platform") is a nonprofit initiative dedicated to connecting surplus resources with those who need them. This Privacy Policy explains what data we collect, why we collect it, and how we protect it.</p>
 
           <h3 className="text-[14px] font-bold text-slate-800">1. Data We Collect</h3>
           <p><strong>Account data:</strong> When you register, we collect your email address, username, account type (donor or recipient), organization name (if applicable), phone number, and region. This is required to operate the platform.</p>
@@ -1699,13 +1699,13 @@ function PrivacyPolicyModal({ onClose }) {
           <p>We use Supabase for database and authentication infrastructure. Their privacy policy applies to infrastructure-level data processing. We do not integrate with social media platforms, advertising networks, or data brokers.</p>
 
           <h3 className="text-[14px] font-bold text-slate-800">8. Children's Privacy</h3>
-          <p>Equilinkz is not directed at children under 13. We do not knowingly collect data from children under 13. If you believe a child has created an account, contact us immediately.</p>
+          <p>Eqovely is not directed at children under 13. We do not knowingly collect data from children under 13. If you believe a child has created an account, contact us immediately.</p>
 
           <h3 className="text-[14px] font-bold text-slate-800">9. Changes to This Policy</h3>
           <p>We may update this Privacy Policy as the platform grows. We will notify registered users of significant changes via the platform's notification system.</p>
 
           <h3 className="text-[14px] font-bold text-slate-800">10. Contact</h3>
-          <p>Questions about your privacy? Contact the Equilinkz team through the platform. Founded by Younus Abdulkadir.</p>
+          <p>Questions about your privacy? Contact the Eqovely team through the platform. Founded by Younus Abdulkadir.</p>
         </div>
         <div className="px-6 py-4 border-t border-slate-100 shrink-0">
           <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -1759,7 +1759,7 @@ function Navbar({
             <IconLink />
           </div>
           <span className="text-[15px] font-semibold tracking-tight text-slate-900">
-            Equilinkz
+            Eqovely
           </span>
         </div>
         <div className="hidden md:flex items-center gap-8">
@@ -2026,7 +2026,7 @@ function PasswordResetModal({ token, onClose }) {
           <>
             <div className="flex items-center gap-2 mb-5">
               <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-white"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 11-7.778 7.778 5.5 5.5 0 017.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
-              <span className="font-semibold text-slate-900">Equilinkz</span>
+              <span className="font-semibold text-slate-900">Eqovely</span>
             </div>
             <h2 id="reset-pwd-title" className="text-[22px] font-bold text-slate-900 mb-1">Set New Password</h2>
             <p className="text-[13px] text-slate-500 mb-5">Choose a strong password for your account.</p>
@@ -2083,21 +2083,21 @@ function TermsModal({ onClose }) {
         </div>
         <div className="overflow-y-auto px-6 py-5 text-[13px] text-slate-600 leading-relaxed space-y-4">
           <p className="text-[11px] text-slate-400">Last updated: {new Date().getFullYear()}</p>
-          <p>Welcome to <strong>Equilinkz</strong>. By creating an account, you agree to these Terms. Please read them carefully.</p>
-          <h3 className="text-[14px] font-bold text-slate-800">1. About Equilinkz</h3>
-          <p>Equilinkz is a nonprofit platform that connects individuals and organizations with surplus resources to those who need them. We facilitate listing, claiming, and transfer of surplus items at no cost.</p>
+          <p>Welcome to <strong>Eqovely</strong>. By creating an account, you agree to these Terms. Please read them carefully.</p>
+          <h3 className="text-[14px] font-bold text-slate-800">1. About Eqovely</h3>
+          <p>Eqovely is a nonprofit platform that connects individuals and organizations with surplus resources to those who need them. We facilitate listing, claiming, and transfer of surplus items at no cost.</p>
           <h3 className="text-[14px] font-bold text-slate-800">2. Eligibility</h3>
           <p>You must be at least 13 years old. Organizations must be registered legal entities. All information you provide must be accurate and truthful.</p>
           <h3 className="text-[14px] font-bold text-slate-800">3. Acceptable Use</h3>
           <p>You agree not to: post fraudulent or misleading listings; harass or harm other users; circumvent security measures; use the platform for commercial resale; list illegal items or controlled substances; impersonate others.</p>
           <h3 className="text-[14px] font-bold text-slate-800">4. Medical Supplies</h3>
-          <p>By claiming medical supplies, you confirm your organization is qualified to receive and safely use them. Equilinkz is not responsible for the condition or suitability of donated medical items.</p>
+          <p>By claiming medical supplies, you confirm your organization is qualified to receive and safely use them. Eqovely is not responsible for the condition or suitability of donated medical items.</p>
           <h3 className="text-[14px] font-bold text-slate-800">5. Transfer Responsibility</h3>
-          <p>Equilinkz facilitates connections but is not a party to any transfer. Donors and recipients are solely responsible for safe, legal handoffs. Always use the 6-digit PIN to verify every transfer.</p>
+          <p>Eqovely facilitates connections but is not a party to any transfer. Donors and recipients are solely responsible for safe, legal handoffs. Always use the 6-digit PIN to verify every transfer.</p>
           <h3 className="text-[14px] font-bold text-slate-800">6. Account Termination</h3>
           <p>We reserve the right to suspend accounts that violate these terms. You may delete your account at any time from Settings.</p>
           <h3 className="text-[14px] font-bold text-slate-800">7. Limitation of Liability</h3>
-          <p>Equilinkz is provided "as is." We are not liable for damages arising from your use of the platform, item quality, or disputes between users.</p>
+          <p>Eqovely is provided "as is." We are not liable for damages arising from your use of the platform, item quality, or disputes between users.</p>
         </div>
         <div className="px-6 py-4 border-t border-slate-100">
           <button onClick={onClose} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500">I Understand</button>
@@ -2345,7 +2345,7 @@ function AuthModal({ onClose, onSuccess }) {
     </p>
   ) : null;
 
-  const modalTitle = mode === "login" ? "Welcome back" : mode === "signup" ? "Join Equilinkz" : mode === "forgot" ? "Reset your password" : "Check your email";
+  const modalTitle = mode === "login" ? "Welcome back" : mode === "signup" ? "Join Eqovely" : mode === "forgot" ? "Reset your password" : "Check your email";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
@@ -2359,7 +2359,7 @@ function AuthModal({ onClose, onSuccess }) {
 
         <div className="flex items-center gap-2 mb-5">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white" aria-hidden="true"><IconLink /></div>
-          <span className="font-semibold text-slate-900">Equilinkz</span>
+          <span className="font-semibold text-slate-900">Eqovely</span>
         </div>
 
         <h2 id="auth-modal-title" className="text-2xl font-bold text-slate-900 mb-1">{modalTitle}</h2>
@@ -2608,7 +2608,7 @@ function OwnerVerifyModal({ listing, user, onVerified, onClose, fetchPin }) {
       createNotification(
         listing.claimer_id,
         "transfer",
-        `Transfer of "${listing.title}" is complete. Thank you for using Equilinkz!`,
+        `Transfer of "${listing.title}" is complete. Thank you for using Eqovely!`,
         listing.id
       );
       setTimeout(() => {
@@ -3509,7 +3509,7 @@ function CertificateModal({ listing, onClose }) {
             <IconAward />
           </div>
           <p className="text-blue-200 text-[11px] font-semibold tracking-widest uppercase mb-1">
-            Equilinkz Impact Certificate
+            Eqovely Impact Certificate
           </p>
           <h2 className="text-2xl font-bold">Resource Transfer Verified</h2>
           <p className="text-blue-200 text-[13px] mt-1">{date}</p>
@@ -3549,7 +3549,7 @@ function CertificateModal({ listing, onClose }) {
           </div>
           <p className="text-center text-[12px] text-slate-400 italic mb-5">
             "Every surplus item rehomed is a step toward a more equitable
-            world." — Equilinkz
+            world." — Eqovely
           </p>
           <button
             onClick={onClose}
@@ -3614,7 +3614,7 @@ function CookieBanner({ onPrivacy }) {
     <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-[45] bg-slate-900 border-t border-slate-700 px-6 py-4">
       <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <p className="text-[13px] text-slate-300 leading-relaxed max-w-2xl">
-          🍪 We use essential cookies to keep you signed in and improve your experience. By using Equilinkz, you agree to our{" "}
+          🍪 We use essential cookies to keep you signed in and improve your experience. By using Eqovely, you agree to our{" "}
           <button onClick={onPrivacy} className="text-blue-400 hover:text-blue-300 underline font-medium">Privacy Policy</button>.
           We never sell your data.
         </p>
@@ -3735,7 +3735,7 @@ function HowItWorksSection({ onBrowse, onDonate, onAuth, user }) {
         <div className="mt-10 bg-slate-900 rounded-3xl p-8 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <p className="text-white font-bold text-[18px] mb-1">Ready to make an impact?</p>
-            <p className="text-slate-400 text-[13px]">Join Equilinkz today — free for donors and recipients worldwide.</p>
+            <p className="text-slate-400 text-[13px]">Join Eqovely today — free for donors and recipients worldwide.</p>
           </div>
           <div className="flex gap-3">
             <button onClick={onDonate} className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl transition-all text-[14px]">
@@ -4474,7 +4474,7 @@ function ListingCard({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      const text = encodeURIComponent(`Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`);
+                      const text = encodeURIComponent(`Check out this item on Eqovely: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`);
                       window.open(`https://wa.me/?text=${text}`, "_blank");
                     }}
                     className="flex items-center gap-1 text-[11px] text-slate-300 hover:text-green-500 transition-all"
@@ -4661,7 +4661,7 @@ function ListingCard({
               For safety, please briefly explain why your organization needs these medical supplies (max 60 words).
             </p>
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-3">
-              <p className="text-[11px] text-amber-700 font-medium">⚠️ Disclaimer: Equilinkz does not verify the safety or suitability of medical supplies. All transfers are at the recipient's own risk. Consult a qualified medical professional before use.</p>
+              <p className="text-[11px] text-amber-700 font-medium">⚠️ Disclaimer: Eqovely does not verify the safety or suitability of medical supplies. All transfers are at the recipient's own risk. Consult a qualified medical professional before use.</p>
             </div>
             <textarea
               value={medReason}
@@ -5512,7 +5512,7 @@ function FormSection({ onSuccess, user }) {
       if (onSuccess) onSuccess();
       else window.scrollTo({ top: 0, behavior: "smooth" });
       setTimeout(() => setSuccess(false), 5000);
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("equilinkz:toast", { detail: { message: "Listing published and live!", type: "success" } }));
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("eqovely:toast", { detail: { message: "Listing published and live!", type: "success" } }));
     } catch (err) {
       setError(err.message || "Submission failed.");
     } finally {
@@ -5835,7 +5835,7 @@ function FormSection({ onSuccess, user }) {
             <h3 className="text-[14px] font-bold">Secure handoffs, always</h3>
           </div>
           <p className="text-[12px] text-blue-100 leading-relaxed">
-            Every transfer on Equilinkz is confirmed with a private PIN exchanged
+            Every transfer on Eqovely is confirmed with a private PIN exchanged
             only between you and the recipient — nothing is marked transferred
             until you both verify it in person.
           </p>
@@ -5862,7 +5862,7 @@ function MissionSection() {
       ),
       bg: "bg-green-50",
       title: "End-to-End Security",
-      desc: "From institutional credential verification at signup to our 6-digit Escrow Handshake PIN at physical pickup, every transaction on Equilinkz is authenticated, logged, and protected at every stage.",
+      desc: "From institutional credential verification at signup to our 6-digit Escrow Handshake PIN at physical pickup, every transaction on Eqovely is authenticated, logged, and protected at every stage.",
     },
     {
       icon: (
@@ -5870,7 +5870,7 @@ function MissionSection() {
       ),
       bg: "bg-purple-50",
       title: "Global Infrastructure",
-      desc: "Operating across 60+ countries and all major world regions, Equilinkz provides the only unified platform purpose-built to coordinate international resource redistribution at scale.",
+      desc: "Operating across 60+ countries and all major world regions, Eqovely provides the only unified platform purpose-built to coordinate international resource redistribution at scale.",
     },
   ];
   return (
@@ -5885,7 +5885,7 @@ function MissionSection() {
             Bridging the Resource Gap, <br className="hidden sm:block" />One Transfer at a Time
           </h2>
           <p className="text-slate-500 max-w-2xl mx-auto text-[15px] leading-relaxed">
-            Equilinkz was founded on a singular belief: that geographic and economic circumstance should never determine whether a student, clinic, or community has access to the resources they need.
+            Eqovely was founded on a singular belief: that geographic and economic circumstance should never determine whether a student, clinic, or community has access to the resources they need.
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
@@ -5900,13 +5900,13 @@ function MissionSection() {
         <div className="bg-gradient-to-br from-blue-600 to-blue-800 rounded-3xl p-10 text-white text-center">
           <h3 className="text-2xl font-bold mb-3">A Message from Our Founder</h3>
           <p className="text-blue-100 text-[15px] leading-relaxed max-w-3xl mx-auto italic mb-4">
-            "I built Equilinkz because I witnessed firsthand how the gap between those who have resources and those who do not compounds every other inequality in education, healthcare, and economic opportunity. This platform is my answer to that problem — a structured, verified, and scalable bridge between surplus and need."
+            "I built Eqovely because I witnessed firsthand how the gap between those who have resources and those who do not compounds every other inequality in education, healthcare, and economic opportunity. This platform is my answer to that problem — a structured, verified, and scalable bridge between surplus and need."
           </p>
           <div className="inline-flex items-center gap-3">
             <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center text-lg font-bold">Y</div>
             <div className="text-left">
               <p className="font-semibold text-white text-[14px]">Younus Abdulkadir</p>
-              <p className="text-blue-200 text-[12px]">Founder & CEO, Equilinkz</p>
+              <p className="text-blue-200 text-[12px]">Founder & CEO, Eqovely</p>
             </div>
           </div>
         </div>
@@ -5994,7 +5994,7 @@ function ImpactSection() {
             Our Goals. Our Vision.
           </h2>
           <p className="text-slate-500 max-w-xl mx-auto text-[15px] leading-relaxed">
-            These are the milestones Equilinkz is built to reach — every transfer brings us closer to a world where technology access is universal.
+            These are the milestones Eqovely is built to reach — every transfer brings us closer to a world where technology access is universal.
           </p>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 mb-16">
@@ -6019,80 +6019,126 @@ function ImpactSection() {
           ))}
         </div>
         <p className="text-center text-[11px] text-slate-400 mt-6 italic">
-          * These figures represent Equilinkz's platform goals and targets, not verified historical data. We are committed to reaching these milestones as our community grows.
+          * These figures represent Eqovely's platform goals and targets, not verified historical data. We are committed to reaching these milestones as our community grows.
         </p>
       </div>
     </section>
   );
 }
 
-// ─── Contact Section ──────────────────────────────────────────────────────────
-function ContactSection() {
+// ─── Contact Modal ────────────────────────────────────────────────────────────
+function ContactModal({ onClose }) {
+  const trapRef = useFocusTrap(true);
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
   return (
-    <section id="contact" className="py-24 bg-slate-50 scroll-mt-20">
-      <div className="max-w-4xl mx-auto px-6">
-        <div className="text-center mb-14">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
-            <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-widest">Get In Touch</span>
-          </div>
-          <h2 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">Contact Us</h2>
-          <p className="text-slate-500 max-w-xl mx-auto text-[15px] leading-relaxed">
-            Whether you're a donor, recipient, partner organization, or just curious — we'd love to hear from you.
-          </p>
-        </div>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title">
+      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
+      <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden">
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          {[
-            {
-              icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-blue-600"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
-              label: "Email",
-              value: "equilinkz@gmail.com",
-              href: "mailto:equilinkz@gmail.com",
-              bg: "bg-blue-50",
-            },
-            {
-              icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-green-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-              label: "Partnerships",
-              value: "Nonprofit & corporate partnerships welcome",
-              href: "mailto:equilinkz@gmail.com?subject=Partnership Inquiry",
-              bg: "bg-green-50",
-            },
-            {
-              icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-purple-600"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-              label: "Response Time",
-              value: "We reply within 24–48 hours",
-              href: null,
-              bg: "bg-purple-50",
-            },
-          ].map(({ icon, label, value, href, bg }) => (
-            <div key={label} className="bg-white border border-slate-100 rounded-2xl p-6 text-center shadow-sm">
-              <div className={`w-12 h-12 ${bg} rounded-xl flex items-center justify-center mx-auto mb-3`}>{icon}</div>
-              <p className="text-[12px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</p>
-              {href ? (
-                <a href={href} className="text-[14px] font-semibold text-blue-600 hover:text-blue-700 transition-colors break-all">{value}</a>
-              ) : (
-                <p className="text-[14px] font-medium text-slate-700">{value}</p>
-              )}
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          aria-label="Close contact dialog"
+          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+        </button>
+
+        <div className="grid grid-cols-1 md:grid-cols-2">
+          {/* Left — brand panel */}
+          <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-8 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2.5 mb-8">
+                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="w-4 h-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                <span className="font-bold text-white text-[15px] tracking-tight">Eqovely</span>
+              </div>
+              <h2 id="contact-modal-title" className="text-[26px] font-bold text-white leading-tight mb-3">
+                Let's connect.
+              </h2>
+              <p className="text-blue-100 text-[13px] leading-relaxed">
+                Whether you're a donor, recipient, partner organization, or just want to learn more — we're here.
+              </p>
             </div>
-          ))}
-        </div>
 
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-3xl p-10 text-center text-white">
-          <h3 className="text-[22px] font-bold mb-2">Ready to make an impact?</h3>
-          <p className="text-blue-100 text-[14px] mb-6 max-w-md mx-auto leading-relaxed">
-            Join thousands of donors and recipients already using Equilinkz to put surplus resources where they're needed most.
-          </p>
-          <a
-            href="mailto:equilinkz@gmail.com"
-            className="inline-flex items-center gap-2 bg-white text-blue-600 hover:bg-blue-50 font-semibold px-6 py-3 rounded-xl transition-all text-[14px] focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-blue-600"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            Send us a message
-          </a>
+            <div className="mt-8 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="w-4 h-4"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <span className="text-blue-100 text-[13px]">eqovely@gmail.com</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </div>
+                <span className="text-blue-100 text-[13px]">Reply within 24–48 hours</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="w-4 h-4"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" strokeLinecap="round"/></svg>
+                </div>
+                <span className="text-blue-100 text-[13px]">Operating in 60+ countries</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right — actions panel */}
+          <div className="p-8 flex flex-col justify-center gap-4">
+            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest mb-1">How can we help?</p>
+
+            {[
+              {
+                icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-blue-600"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+                title: "General Inquiry",
+                desc: "Questions about the platform or how it works",
+                href: "mailto:eqovely@gmail.com",
+                bg: "bg-blue-50 hover:bg-blue-100 border-blue-100",
+              },
+              {
+                icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-green-600"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" strokeLinecap="round"/></svg>,
+                title: "Partnership",
+                desc: "Nonprofit, corporate, or institutional partnerships",
+                href: "mailto:eqovely@gmail.com?subject=Partnership Inquiry",
+                bg: "bg-green-50 hover:bg-green-100 border-green-100",
+              },
+              {
+                icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-amber-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+                title: "Report an Issue",
+                desc: "Technical problems or content concerns",
+                href: "mailto:eqovely@gmail.com?subject=Issue Report",
+                bg: "bg-amber-50 hover:bg-amber-100 border-amber-100",
+              },
+            ].map(({ icon, title, desc, href, bg }) => (
+              <a
+                key={title}
+                href={href}
+                className={`flex items-center gap-4 p-4 rounded-2xl border transition-all group focus:outline-none focus:ring-2 focus:ring-blue-500 ${bg}`}
+              >
+                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
+                  {icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[14px] font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">{title}</p>
+                  <p className="text-[12px] text-slate-500 truncate">{desc}</p>
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-slate-300 group-hover:text-blue-500 shrink-0 transition-colors"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </a>
+            ))}
+
+            <p className="text-[11px] text-slate-400 text-center mt-2">
+              Founded by <span className="font-semibold text-slate-500">Younus Abdulkadir</span>
+            </p>
+          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -6107,7 +6153,7 @@ function Footer({ onPrivacy }) {
               <div className="w-7 h-7 bg-blue-500 rounded-lg flex items-center justify-center text-white">
                 <IconLink />
               </div>
-              <span className="font-semibold tracking-tight">Equilinkz</span>
+              <span className="font-semibold tracking-tight">Eqovely</span>
             </div>
             <p className="text-slate-400 text-[13px] leading-relaxed mb-3">
               Bridging the global resource gap through intelligent matching of
@@ -6127,22 +6173,22 @@ function Footer({ onPrivacy }) {
             <a href="#how-it-works" className="text-[13px] text-slate-400 hover:text-white transition-colors">How It Works</a>
             <a href="#impact" className="text-[13px] text-slate-400 hover:text-white transition-colors">Our Goals</a>
             <button onClick={onPrivacy} className="text-[13px] text-slate-400 hover:text-white transition-colors text-left">Privacy Policy</button>
-            <a href="mailto:equilinkz@gmail.com" className="text-[13px] text-slate-400 hover:text-white transition-colors">Contact Us</a>
+            <a href="mailto:eqovely@gmail.com" className="text-[13px] text-slate-400 hover:text-white transition-colors">Contact Us</a>
           </div>
           <div className="mt-6 md:mt-0">
             <p className="text-[12px] text-slate-500 mb-2">Get in touch</p>
-            <a href="mailto:equilinkz@gmail.com" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-[13px] font-medium">
+            <a href="mailto:eqovely@gmail.com" className="flex items-center gap-2 text-blue-400 hover:text-blue-300 transition-colors text-[13px] font-medium">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
                 <polyline points="22,6 12,13 2,6"/>
               </svg>
-              equilinkz@gmail.com
+              eqovely@gmail.com
             </a>
           </div>
         </div>
         <div className="border-t border-slate-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-[12px] text-slate-500">
-            © 2025 Equilinkz. All rights reserved. Founded by Younus Abdulkadir.
+            © 2025 Eqovely. All rights reserved. Founded by Younus Abdulkadir.
           </p>
           <p className="text-[12px] text-slate-500">
             Built to create global equity, one resource at a time.
@@ -6177,7 +6223,7 @@ function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToa
   };
 
   const handleWhatsApp = () => {
-    const text = encodeURIComponent(`Check out this item on Equilinkz: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`);
+    const text = encodeURIComponent(`Check out this item on Eqovely: "${listing.title}" — ${window.location.origin}?listing=${listing.id}`);
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
 
@@ -6633,7 +6679,7 @@ function Dashboard({
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-slate-100 fixed top-0 left-0 h-full z-30 shadow-sm">
         {/* Logo */}
         <div className="px-5 py-5 border-b border-slate-100">
-          <span className="text-[20px] font-black text-blue-600 tracking-tight">Equilinkz</span>
+          <span className="text-[20px] font-black text-blue-600 tracking-tight">Eqovely</span>
           <p className="text-[10px] text-slate-400 mt-0.5">Bridging the resource gap</p>
         </div>
 
@@ -6717,7 +6763,7 @@ function Dashboard({
           {/* Sticky close bar */}
           <div className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-slate-100 flex items-center justify-between px-5 py-3 shadow-sm">
             <div className="flex items-center gap-2">
-              <span className="text-[16px] font-black text-blue-600 tracking-tight">Equilinkz</span>
+              <span className="text-[16px] font-black text-blue-600 tracking-tight">Eqovely</span>
               <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full font-medium">Public View</span>
             </div>
             <button
@@ -7205,7 +7251,7 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
         {/* Data & Privacy — GDPR */}
         <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm mb-4">
           <h2 className="text-[15px] font-bold text-slate-800 mb-1">Data & Privacy</h2>
-          <p className="text-[12px] text-slate-500 mb-4">You have the right to access and download all data Equilinkz holds about you.</p>
+          <p className="text-[12px] text-slate-500 mb-4">You have the right to access and download all data Eqovely holds about you.</p>
           <button
             onClick={async () => {
               try {
@@ -7226,7 +7272,7 @@ function DashboardContent({ view, setView, user, isRecipient, isDonor, onOpenCha
                 const blob = new Blob([JSON.stringify(export_data, null, 2)], { type: "application/json" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
-                a.href = url; a.download = `equilinkz-data-${user.email}-${Date.now()}.json`; a.click();
+                a.href = url; a.download = `eqovely-data-${user.email}-${Date.now()}.json`; a.click();
                 URL.revokeObjectURL(url);
                 if (showToast) showToast("Your data has been downloaded.", "success");
               } catch { if (showToast) showToast("Export failed. Please try again.", "error"); }
@@ -7434,7 +7480,7 @@ class ErrorBoundary extends React.Component {
   componentDidCatch(error, info) {
     this.setState({ info });
     // In production you'd send this to Sentry / your error tracking service
-    console.error("[Equilinkz] Unhandled error:", error, info);
+    console.error("[Eqovely] Unhandled error:", error, info);
   }
   render() {
     if (this.state.error) {
@@ -7468,6 +7514,7 @@ export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showAuth, setShowAuth] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [resetToken, setResetToken] = useState(null);
   const [chatListing, setChatListing] = useState(null);
@@ -7667,8 +7714,8 @@ export default function App() {
   // Listen for privacy modal open event from ToS/Privacy links inside AuthModal
   useEffect(() => {
     const handler = () => setShowPrivacy(true);
-    window.addEventListener("equilinkz:openPrivacy", handler);
-    return () => window.removeEventListener("equilinkz:openPrivacy", handler);
+    window.addEventListener("eqovely:openPrivacy", handler);
+    return () => window.removeEventListener("eqovely:openPrivacy", handler);
   }, []);
   const handleSignOut = () => setShowSignOutConfirm(true);
   const confirmSignOut = () => {
@@ -7703,6 +7750,9 @@ export default function App() {
           onSuccess={handleAuthSuccess}
         />
       )}
+      {showContactModal && (
+        <ContactModal onClose={() => setShowContactModal(false)} />
+      )}
       {showPrivacy && (
         <PrivacyPolicyModal onClose={() => setShowPrivacy(false)} />
       )}
@@ -7731,7 +7781,7 @@ export default function App() {
           <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 text-center">
             <div className="text-4xl mb-3">👋</div>
             <h3 className="text-[17px] font-bold text-slate-900 mb-2">Sign out?</h3>
-            <p className="text-[13px] text-slate-500 mb-6">Are you sure you want to sign out of Equilinkz?</p>
+            <p className="text-[13px] text-slate-500 mb-6">Are you sure you want to sign out of Eqovely?</p>
             <div className="flex gap-3">
               <button onClick={() => setShowSignOutConfirm(false)} className="flex-1 py-3 text-[14px] font-semibold text-slate-700 border border-slate-200 rounded-2xl hover:bg-slate-50 transition-all">Cancel</button>
               <button onClick={confirmSignOut} className="flex-1 py-3 text-[14px] font-semibold text-white bg-red-500 hover:bg-red-600 rounded-2xl transition-all">Sign Out</button>
@@ -7766,7 +7816,7 @@ export default function App() {
             onBrowse={() => setShowAuth(true)}
             onPartners={() => scrollToId("partners")}
             onImpact={() => scrollToId("impact")}
-            onContact={() => scrollToId("contact")}
+            onContact={() => setShowContactModal(true)}
             onDonate={() => setShowAuth(true)}
             user={user}
             onAuth={() => setShowAuth(true)}
@@ -7791,7 +7841,6 @@ export default function App() {
           <div ref={missionRef}><MissionSection /></div>
           <div ref={partnersRef}><PartnersSection /></div>
           <div ref={impactRef}><ImpactSection /></div>
-          <ContactSection />
           <Footer onPrivacy={() => setShowPrivacy(true)} />
         </>
       )}
