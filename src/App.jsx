@@ -6206,6 +6206,14 @@ function Footer({ onPrivacy }) {
 function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToast }) {
   const [imgIndex, setImgIndex] = useState(0);
   const [claiming, setClaiming] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
+  const trapRef = useFocusTrap(true);
+
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
 
   if (!listing) return null;
 
@@ -6247,53 +6255,55 @@ function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToa
   const catStyle = CATEGORY_COLORS[listing.category] || CATEGORY_COLORS["Other"];
   const isDone = listing.status === "claimed" || listing.status === "transferred";
   const isOwner = user && user.email === listing.owner_email;
+  const desc = listing.description || "";
+  const descIsLong = desc.length > 140;
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="listing-modal-title">
+      {/* Light backdrop — premium feel, not a heavy black overlay */}
+      <div className="absolute inset-0 bg-slate-500/20 backdrop-blur-md" onClick={onClose} aria-hidden="true" />
 
-      {/* Modal */}
-      <div className="relative bg-white w-full sm:max-w-2xl sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
-        {/* Close button */}
-        <button onClick={onClose} className="absolute top-4 right-4 z-10 w-9 h-9 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 shadow-sm transition-all">
+      {/* Compact modal — side-by-side so everything fits without scrolling */}
+      <div ref={trapRef} className="relative bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden grid grid-cols-1 sm:grid-cols-2 max-h-[90vh]">
+
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 z-10 w-8 h-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
           <IconX />
         </button>
 
-        {/* Image carousel — full screen, high quality */}
-        <div className="relative w-full bg-black shrink-0" style={{ height: "min(60vw, 420px)" }}>
+        {/* Left — compact photo, fixed aspect ratio so it never dominates */}
+        <div className="relative w-full aspect-square sm:aspect-auto sm:h-full bg-slate-100 shrink-0">
           {images.length > 0 ? (
             <>
-              {/* Full quality image — object-contain so nothing is cropped */}
               <img
                 src={images[imgIndex]}
                 alt={listing.title}
-                className="w-full h-full object-contain"
-                style={{ background: "#000" }}
+                className="w-full h-full object-cover"
               />
-              {/* Subtle dark gradient at bottom for dots visibility */}
-              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
               {images.length > 1 && (
                 <>
                   <button onClick={() => setImgIndex(i => (i - 1 + images.length) % images.length)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-sm">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    aria-label="Previous photo"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center text-slate-700 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                   <button onClick={() => setImgIndex(i => (i + 1) % images.length)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 bg-black/40 hover:bg-black/60 rounded-full flex items-center justify-center text-white transition-all backdrop-blur-sm">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    aria-label="Next photo"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/80 hover:bg-white rounded-full flex items-center justify-center text-slate-700 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
-                  {/* White dot indicators */}
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 items-center">
+                  <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 flex gap-1.5" role="tablist" aria-label="Photo gallery">
                     {images.map((_, i) => (
                       <button
                         key={i}
                         onClick={() => setImgIndex(i)}
-                        className={`rounded-full transition-all duration-300 ${
-                          i === imgIndex
-                            ? "w-5 h-2 bg-white"
-                            : "w-2 h-2 bg-white/50 hover:bg-white/80"
-                        }`}
+                        role="tab"
+                        aria-selected={i === imgIndex}
+                        aria-label={`Photo ${i + 1} of ${images.length}`}
+                        className={`rounded-full transition-all duration-300 ${i === imgIndex ? "w-4 h-1.5 bg-white" : "w-1.5 h-1.5 bg-white/60"}`}
                       />
                     ))}
                   </div>
@@ -6301,44 +6311,61 @@ function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToa
               )}
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-slate-100"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-8 h-8 text-slate-300"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8L6 7h12l-2-4z" strokeLinecap="round" strokeLinejoin="round"/></svg></div>
+            <div className="w-full h-full flex items-center justify-center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-10 h-10 text-slate-300"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8L6 7h12l-2-4z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
           )}
         </div>
 
-        {/* Content - scrollable */}
-        <div className="overflow-y-auto flex-1 p-6">
-          {/* Category + status */}
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border ${catStyle}`}>{listing.category}</span>
-            {isDone && <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-500 border border-slate-200">{listing.status === "claimed" ? "Claimed" : "Transferred"}</span>}
+        {/* Right — details + all actions, compact and fully visible, no scroll */}
+        <div className="p-6 flex flex-col overflow-y-auto">
+          <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${catStyle}`}>{listing.category}</span>
+            {isDone && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">{listing.status === "claimed" ? "Claimed" : "Transferred"}</span>}
           </div>
 
-          {/* Title */}
-          <h2 className="text-xl font-bold text-slate-900 mb-1 leading-tight">{listing.title}</h2>
+          <h2 id="listing-modal-title" className="text-[18px] font-bold text-slate-900 mb-1.5 leading-tight">{listing.title}</h2>
 
-          {/* Meta */}
-          <div className="flex flex-wrap gap-3 text-[12px] text-slate-500 mb-4">
-            {listing.location && <span className="flex items-center gap-1">📍 {listing.location}</span>}
-            {listing.quantity && <span className="flex items-center gap-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3.5 h-3.5 text-slate-400" aria-hidden="true"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" strokeLinecap="round"/></svg> Qty: {listing.quantity}</span>}
-            {listing.condition && <span className="flex items-center gap-1">{listing.condition}</span>}
-            {listing.created_at && <span className="flex items-center gap-1">🕐 {new Date(listing.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>}
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-slate-500 mb-3">
+            {listing.location && (
+              <span className="flex items-center gap-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3 h-3 text-slate-400" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                {listing.location}
+              </span>
+            )}
+            {listing.quantity && (
+              <span className="flex items-center gap-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-3 h-3 text-slate-400" aria-hidden="true"><path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" strokeLinecap="round"/></svg>
+                Qty: {listing.quantity}
+              </span>
+            )}
+            {listing.condition && <span>{listing.condition}</span>}
           </div>
 
-          {/* Description */}
-          {listing.description && (
-            <p className="text-[14px] text-slate-600 leading-relaxed mb-5 whitespace-pre-wrap">{listing.description}</p>
+          {desc && (
+            <div className="mb-4">
+              <p className="text-[12.5px] text-slate-600 leading-relaxed">
+                {descIsLong && !descExpanded ? desc.slice(0, 140) + "…" : desc}
+              </p>
+              {descIsLong && (
+                <button
+                  onClick={() => setDescExpanded(p => !p)}
+                  aria-expanded={descExpanded}
+                  className="text-[11px] text-blue-600 hover:text-blue-800 font-medium mt-1 focus:outline-none focus:underline"
+                >
+                  {descExpanded ? "Show less" : "Show more"}
+                </button>
+              )}
+            </div>
           )}
 
-          {/* Divider */}
-          <div className="h-px bg-slate-100 mb-5" />
-
-          {/* Actions */}
-          <div className="flex flex-col gap-3">
+          {/* Actions — compact, all visible together */}
+          <div className="mt-auto flex flex-col gap-2 pt-2">
             {!isDone && !isOwner && user && (
               <button
                 onClick={handleClaim}
                 disabled={claiming}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-3.5 rounded-2xl transition-all shadow-lg shadow-blue-200 text-[15px]"
+                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-semibold py-2.5 rounded-xl transition-all shadow-md shadow-blue-100 text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {claiming ? <><IconLoader /> Claiming…</> : <><IconArrow /> Claim This Item</>}
               </button>
@@ -6346,25 +6373,25 @@ function ListingDetailModal({ listing, user, onClose, onClaim, onOpenChat, onToa
             {!isOwner && user && onOpenChat && listing.owner_email && (
               <button
                 onClick={() => { onOpenChat(listing); onClose(); }}
-                className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-3 rounded-2xl transition-all text-[14px]"
+                className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl transition-all text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 Message Donor
               </button>
             )}
             <div className="flex gap-2">
               <button
                 onClick={handleWhatsApp}
-                className="flex-1 flex items-center justify-center gap-2 bg-green-50 hover:bg-green-100 text-green-700 font-medium py-2.5 rounded-xl transition-all text-[13px] border border-green-100"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-green-50 hover:bg-green-100 text-green-700 font-medium py-2 rounded-lg transition-all text-[11.5px] border border-green-100 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
-                <svg viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                Share on WhatsApp
+                <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5" aria-hidden="true"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                WhatsApp
               </button>
               <button
                 onClick={handleCopyLink}
-                className="flex-1 flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-slate-600 font-medium py-2.5 rounded-xl transition-all text-[13px] border border-slate-200"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 font-medium py-2 rounded-lg transition-all text-[11.5px] border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-400"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5" aria-hidden="true"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" strokeLinecap="round" strokeLinejoin="round"/></svg>
                 Copy Link
               </button>
             </div>
