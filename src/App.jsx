@@ -1755,9 +1755,7 @@ function Navbar({
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-md shadow-blue-200 text-white">
-            <IconLink />
-          </div>
+          <img src="/eqovely.png" alt="Eqovely" className="h-8 w-auto" />
           <span className="text-[15px] font-semibold tracking-tight text-slate-900">
             Eqovely
           </span>
@@ -2358,7 +2356,7 @@ function AuthModal({ onClose, onSuccess }) {
         </button>
 
         <div className="flex items-center gap-2 mb-5">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white" aria-hidden="true"><IconLink /></div>
+          <img src="/eqovely.png" alt="Eqovely" className="h-7 w-auto" />
           <span className="font-semibold text-slate-900">Eqovely</span>
         </div>
 
@@ -6028,114 +6026,118 @@ function ImpactSection() {
 
 // ─── Contact Modal ────────────────────────────────────────────────────────────
 function ContactModal({ onClose }) {
-  const trapRef = useFocusTrap(true);
   useEffect(() => {
     const h = (e) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
+    // Lock body scroll while this full-screen page is open
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", h);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="contact-modal-title">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-      <div ref={trapRef} className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden">
+  const options = [
+    {
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-blue-600"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
+      title: "General Inquiry",
+      desc: "Questions about the platform or how it works",
+      href: "mailto:eqovely@gmail.com",
+      bg: "bg-blue-50 group-hover:bg-blue-100 border-blue-100",
+    },
+    {
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-green-600"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" strokeLinecap="round"/></svg>,
+      title: "Partnership",
+      desc: "Nonprofit, corporate, or institutional partnerships",
+      href: "mailto:eqovely@gmail.com?subject=Partnership Inquiry",
+      bg: "bg-green-50 group-hover:bg-green-100 border-green-100",
+    },
+    {
+      icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-6 h-6 text-amber-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+      title: "Report an Issue",
+      desc: "Technical problems or content concerns",
+      href: "mailto:eqovely@gmail.com?subject=Issue Report",
+      bg: "bg-amber-50 group-hover:bg-amber-100 border-amber-100",
+    },
+  ];
 
-        {/* Close button */}
+  return (
+    <div
+      className="fixed inset-0 z-[70] bg-white flex flex-col"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="contact-page-title"
+    >
+      {/* Top bar — logo + close, no dark backdrop anywhere */}
+      <div className="flex items-center justify-between px-6 md:px-10 py-5 shrink-0 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <img src="/eqovely.png" alt="Eqovely" className="h-8 w-auto" />
+          <span className="font-bold text-slate-900 text-[16px] tracking-tight">Eqovely</span>
+        </div>
         <button
           onClick={onClose}
-          aria-label="Close contact dialog"
-          className="absolute top-4 right-4 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label="Close and return"
+          className="flex items-center gap-2 text-[13px] font-semibold text-slate-500 hover:text-slate-900 px-4 py-2 rounded-xl hover:bg-slate-100 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-3.5 h-3.5"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="w-4 h-4"><path d="M18 6L6 18M6 6l12 12" strokeLinecap="round"/></svg>
+          Close
         </button>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          {/* Left — brand panel */}
-          <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-8 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2.5 mb-8">
-                <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" className="w-4 h-4"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-                <span className="font-bold text-white text-[15px] tracking-tight">Eqovely</span>
-              </div>
-              <h2 id="contact-modal-title" className="text-[26px] font-bold text-white leading-tight mb-3">
-                Let's connect.
-              </h2>
-              <p className="text-blue-100 text-[13px] leading-relaxed">
-                Whether you're a donor, recipient, partner organization, or just want to learn more — we're here.
-              </p>
-            </div>
-
-            <div className="mt-8 space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="w-4 h-4"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                </div>
-                <span className="text-blue-100 text-[13px]">eqovely@gmail.com</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                </div>
-                <span className="text-blue-100 text-[13px]">Reply within 24–48 hours</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center shrink-0">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" className="w-4 h-4"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" strokeLinecap="round"/></svg>
-                </div>
-                <span className="text-blue-100 text-[13px]">Operating in 60+ countries</span>
-              </div>
-            </div>
+      {/* Main content — vertically centered, everything visible without scrolling */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 md:px-10 py-8 max-w-5xl mx-auto w-full">
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-2 mb-4 bg-blue-50 px-3 py-1.5 rounded-full">
+            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+            <span className="text-[11px] font-semibold text-blue-600 uppercase tracking-widest">Get in Touch</span>
           </div>
+          <h1 id="contact-page-title" className="text-[32px] md:text-[40px] font-bold text-slate-900 tracking-tight mb-3">
+            Let's connect.
+          </h1>
+          <p className="text-slate-500 text-[15px] max-w-lg mx-auto leading-relaxed">
+            Whether you're a donor, recipient, partner organization, or just curious — we're here and typically reply within 24–48 hours.
+          </p>
+        </div>
 
-          {/* Right — actions panel */}
-          <div className="p-8 flex flex-col justify-center gap-4">
-            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-widest mb-1">How can we help?</p>
+        {/* Three options — all visible at once, no scroll needed */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 w-full mb-10">
+          {options.map(({ icon, title, desc, href, bg }) => (
+            <a
+              key={title}
+              href={href}
+              className="group flex flex-col items-center text-center gap-3 p-6 rounded-2xl border border-slate-100 hover:border-slate-200 hover:shadow-lg transition-all focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${bg}`}>
+                {icon}
+              </div>
+              <div>
+                <p className="text-[15px] font-bold text-slate-900 mb-1">{title}</p>
+                <p className="text-[12px] text-slate-500 leading-relaxed">{desc}</p>
+              </div>
+              <span className="text-[12px] font-semibold text-blue-600 group-hover:text-blue-700 inline-flex items-center gap-1 mt-1">
+                Send email
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </span>
+            </a>
+          ))}
+        </div>
 
-            {[
-              {
-                icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-blue-600"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>,
-                title: "General Inquiry",
-                desc: "Questions about the platform or how it works",
-                href: "mailto:eqovely@gmail.com",
-                bg: "bg-blue-50 hover:bg-blue-100 border-blue-100",
-              },
-              {
-                icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-green-600"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" strokeLinecap="round"/></svg>,
-                title: "Partnership",
-                desc: "Nonprofit, corporate, or institutional partnerships",
-                href: "mailto:eqovely@gmail.com?subject=Partnership Inquiry",
-                bg: "bg-green-50 hover:bg-green-100 border-green-100",
-              },
-              {
-                icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-amber-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" strokeLinecap="round" strokeLinejoin="round"/></svg>,
-                title: "Report an Issue",
-                desc: "Technical problems or content concerns",
-                href: "mailto:eqovely@gmail.com?subject=Issue Report",
-                bg: "bg-amber-50 hover:bg-amber-100 border-amber-100",
-              },
-            ].map(({ icon, title, desc, href, bg }) => (
-              <a
-                key={title}
-                href={href}
-                className={`flex items-center gap-4 p-4 rounded-2xl border transition-all group focus:outline-none focus:ring-2 focus:ring-blue-500 ${bg}`}
-              >
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm shrink-0">
-                  {icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[14px] font-semibold text-slate-900 group-hover:text-blue-700 transition-colors">{title}</p>
-                  <p className="text-[12px] text-slate-500 truncate">{desc}</p>
-                </div>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 text-slate-300 group-hover:text-blue-500 shrink-0 transition-colors"><path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              </a>
-            ))}
-
-            <p className="text-[11px] text-slate-400 text-center mt-2">
-              Founded by <span className="font-semibold text-slate-500">Younus Abdulkadir</span>
-            </p>
-          </div>
+        {/* Direct email + footer info — all visible, no scrolling */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-8 text-center sm:text-left">
+          <a href="mailto:eqovely@gmail.com" className="flex items-center gap-2.5 text-[14px] font-semibold text-slate-700 hover:text-blue-600 transition-colors">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5 text-slate-400"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            eqovely@gmail.com
+          </a>
+          <span className="hidden sm:block w-px h-4 bg-slate-200" aria-hidden="true" />
+          <span className="flex items-center gap-2.5 text-[13px] text-slate-400">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" strokeLinecap="round"/></svg>
+            Operating in 60+ countries
+          </span>
+          <span className="hidden sm:block w-px h-4 bg-slate-200" aria-hidden="true" />
+          <span className="text-[13px] text-slate-400">
+            Founded by <span className="font-semibold text-slate-600">Younus Abdulkadir</span>
+          </span>
         </div>
       </div>
     </div>
