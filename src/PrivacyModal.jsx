@@ -1,5 +1,5 @@
 // ─── PrivacyModal.jsx ─────────────────────────────────────────────────────────
-// Drop-in privacy agreement modal for Equilinkz.
+// Drop-in privacy agreement modal for Eqovely.
 // Usage:
 //   import PrivacyModal from './PrivacyModal';
 //   <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} onAgree={() => { setShowPrivacy(false); /* continue flow */ }} />
@@ -42,7 +42,7 @@ export default function PrivacyModal({ isOpen, onClose, onAgree }) {
               </h2>
             </div>
             <p className="text-[12px] text-slate-400">
-              Equilinkz Global Resource Marketplace · Last updated May 2025
+              Eqovely Global Resource Marketplace · Last updated May 2025
             </p>
           </div>
           <button
@@ -68,7 +68,7 @@ export default function PrivacyModal({ isOpen, onClose, onAgree }) {
             </div>
             <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 space-y-3">
               <p>
-                Equilinkz collects and processes personal data solely to
+                Eqovely collects and processes personal data solely to
                 facilitate verified resource transfers between donors and
                 recipient institutions. All credentials — including email
                 addresses, international phone formats, and Tax Identification
@@ -144,7 +144,7 @@ export default function PrivacyModal({ isOpen, onClose, onAgree }) {
                   unaffiliated domains, or impersonation of registered
                   institutions — will result in immediate account restriction,
                   permanent asset flagging, and referral to the appropriate
-                  legal authority in the user's jurisdiction. Equilinkz reserves
+                  legal authority in the user's jurisdiction. Eqovely reserves
                   the right to revoke verified badges and deny platform access
                   without prior notice.
                 </p>
@@ -164,13 +164,13 @@ export default function PrivacyModal({ isOpen, onClose, onAgree }) {
             </div>
             <div className="bg-slate-800/60 border border-slate-700 rounded-2xl p-5 space-y-3">
               <p>
-                The Equilinkz platform operates exclusively as a{" "}
+                The Eqovely platform operates exclusively as a{" "}
                 <strong className="text-white">
                   communication, verification, and coordination vehicle
                 </strong>
                 . Our infrastructure facilitates the introduction of donors and
                 recipient organizations and provides a structured handoff
-                protocol via the 4-digit Escrow Verification PIN system.
+                protocol via the 6-digit Escrow Verification PIN system.
               </p>
               <p>
                 By using this platform, all parties explicitly acknowledge and
@@ -178,10 +178,10 @@ export default function PrivacyModal({ isOpen, onClose, onAgree }) {
               </p>
               <ul className="list-none space-y-2 mt-1">
                 {[
-                  "Equilinkz bears no legal responsibility for the physical condition, safety, functionality, or regulatory compliance of any item transferred through the platform.",
+                  "Eqovely bears no legal responsibility for the physical condition, safety, functionality, or regulatory compliance of any item transferred through the platform.",
                   "The physical exchange of hardware, supplies, or any tangible asset is conducted solely between the donor and recipient parties at their mutual discretion and risk.",
-                  "Equilinkz is not a logistics provider, warranty issuer, or insurance carrier. No claim may be made against the platform for damage, loss, theft, or injury occurring during or after physical handoff.",
-                  "The 4-digit PIN handshake confirms mutual intent to transfer and serves as a digital record of agreement — it does not constitute a legally binding commercial contract under any jurisdiction.",
+                  "Eqovely is not a logistics provider, warranty issuer, or insurance carrier. No claim may be made against the platform for damage, loss, theft, or injury occurring during or after physical handoff.",
+                  "The 6-digit PIN handshake confirms mutual intent to transfer and serves as a digital record of agreement — it does not constitute a legally binding commercial contract under any jurisdiction.",
                 ].map((item, i) => (
                   <li key={i} className="flex items-start gap-2.5">
                     <span className="w-1.5 h-1.5 bg-violet-500 rounded-full mt-2 shrink-0" />

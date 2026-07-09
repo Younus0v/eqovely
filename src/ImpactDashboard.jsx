@@ -1,5 +1,5 @@
 // ─── ImpactDashboard.jsx ──────────────────────────────────────────────────────
-// Live impact metrics grid for Equilinkz.
+// Live impact metrics grid for Eqovely.
 // Fetches directly from Supabase on mount and refreshes every 30s.
 // Usage:
 //   import ImpactDashboard from './ImpactDashboard';
@@ -147,7 +147,7 @@ export default function ImpactDashboard() {
       ),
       label: "Successful Handoffs",
       value: metrics.handoffs,
-      sub: "Items finalized via 4-digit escrow PIN",
+      sub: "Items finalized via 6-digit escrow PIN",
       color: "text-green-600",
       bg: "bg-green-50",
       border: "border-green-100",
