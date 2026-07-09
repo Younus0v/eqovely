@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="./public/eqovely.png" alt="Eqovely" width="120" />
-
 # Eqovely
 
 **Bridging the resource gap, one transfer at a time.**
